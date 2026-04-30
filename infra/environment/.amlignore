@@ -1,0 +1,11 @@
+# .amlignore
+.venv/
+venv/
+__pycache__/
+.git/
+*.pth
+*.pt
+dataset/
+logs/
+outputs/
+src/

@@ -1,0 +1,23 @@
+# # Python build artifacts
+# **/*.egg-info/
+# **/__pycache__/
+# **/*.pyc
+# **/*.pyo
+#
+# # UV / pip artifacts
+# .venv/
+# uv.lock
+# *.dist-info/
+#
+# # Local junk
+# .ipynb_checkpoints/
+# .vscode/
+# dataset/
+# infra/
+# config.json
+# *
+# !**/*.py
+*
+
+!src/
+!main.py

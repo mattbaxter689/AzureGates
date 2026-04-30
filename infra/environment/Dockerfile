@@ -16,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 
 # Install all dependencies into /usr/local (system Python)
 # --no-dev skips test extras; adjust if you want them in the image
-RUN uv pip install --system .
+RUN uv sync --frozen --no-install-workspace --no-cache
 
 # Non-root user for security
 RUN useradd --create-home --shell /bin/bash mluser && \
