@@ -64,7 +64,7 @@ def get_client() -> MLClient:
 
 def get_aml_environment() -> str:
     cfg_env = CONFIG["environment"]
-    return f"{cfg_env['name']}:{cfg_env['version']}"
+    return f"{cfg_env['name']}@latest"
 
 
 # ------ Base Job Config ----------
@@ -77,18 +77,20 @@ def _base_job_kwargs(name: str, description: str) -> dict:
         environment=get_aml_environment(),
         compute=compute,
         experiment_name=CONFIG["pipeline"]["experiment_name"],
-        # code=absolute_path,
+        code="./src",
         environment_variables={"PYTHONPATH": "./"},
     )
 
 
 # ------ Job Builders ---------
 def build_data_job(ml_client: MLClient) -> Command:
-    # Fetch asset explicitly to avoid resolution errors
-    data_asset = ml_client.data.get(
-        name=CONFIG["data"]["name"], label=CONFIG["data"]["version"]
-    )
-    print(data_asset)
+
+    # return command(
+    #     code="./src",  # Set to None
+    #     command="echo 'Hello World'",  # Minimal command
+    #     environment=get_aml_environment(),
+    #     # ...
+    # )
 
     return command(
         **_base_job_kwargs(
@@ -101,7 +103,7 @@ def build_data_job(ml_client: MLClient) -> Command:
             "--output-uuid-file ${{outputs.uuid_file}}"
         ),
         inputs={
-            "raw_data": Input(type="uri_file", path=data_asset.id),  # Pass asset ID
+            "raw_data": Input(type="uri_file", path=CONFIG["data"]["name"]),
             "output_base_uri": CONFIG["data"]["output_base_uri"],
         },
         outputs={"uuid_file": {"type": "uri_file", "mode": "rw_mount"}},

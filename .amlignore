@@ -1,0 +1,33 @@
+# Python build artifacts
+**/*.egg-info/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.pt
+*.pth
+
+# UV / pip artifacts
+.venv/
+venv/
+# uv.lock
+*.dist-info/
+
+# Local junk
+.ipynb_checkpoints/
+.vscode/
+.git/
+dataset/
+infra/terraform
+*.tfstate
+config.json
+dataset/
+logs/
+outputs/
+# src/
+
+# *
+# !**/*.py
+
+# !src/
+# !**/*.py
+# !main.py
