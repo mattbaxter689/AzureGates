@@ -1,28 +1,29 @@
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim
 
-# Install uv — the Rust-based Python package installer
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Pin to a specific uv version for reproducibility
+COPY --from=ghcr.io/astral-sh/uv:0.7.12 /uv /usr/local/bin/uv
 
-# uv respects this to avoid creating a venv inside the venv
-ENV UV_SYSTEM_PYTHON=1 \
-    UV_COMPILE_BYTECODE=1 \
+ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    PYTHONDONTWRITEBYTECODE=1
+    UV_PYTHON_DOWNLOADS=never \
+    # This is the key: installs into system Python, not a .venv
+    UV_PROJECT_ENVIRONMENT=/usr/local
 
 WORKDIR /app
-
-# Copy dependency manifest first for layer-cache efficiency
 COPY pyproject.toml uv.lock ./
 
-# Install all dependencies into /usr/local (system Python)
-# --no-dev skips test extras; adjust if you want them in the image
-RUN uv sync --frozen --no-install-workspace --no-cache
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --no-dev
 
-# Non-root user for security
+COPY . .
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+# Non-root user
 RUN useradd --create-home --shell /bin/bash mluser && \
     chown -R mluser:mluser /app
 USER mluser
 
-# Default entrypoint (overridden per gate by AML Command Jobs)
 ENTRYPOINT ["python"]
 CMD ["--help"]

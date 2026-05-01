@@ -21,11 +21,6 @@ output "acr_login_server" {
   value = azurerm_container_registry.acr.login_server
 }
 
-# Managed Identity
-output "managed_identity_client_id" {
-  value = azurerm_user_assigned_identity.aml_identity.client_id
-}
-
 # Key Vault and App Insights IDs (optional, useful for Python SDK)
 output "key_vault_id" {
   value = azurerm_key_vault.kv.id

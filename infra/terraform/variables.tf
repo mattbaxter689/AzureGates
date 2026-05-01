@@ -23,3 +23,8 @@ variable "storage_account_name" {
   description = "Storage account name (globally unique)"
   type        = string
 }
+
+variable "cpu_cluster_name" {
+  description = "The name of the CPU training cluster on Azure"
+  type        = string
+}
