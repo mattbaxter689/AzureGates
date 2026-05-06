@@ -28,7 +28,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     4. Strip whitespace from string columns.
     """
     before = len(df)
-    df = df.drop_duplicates()
+    df = df.drop_duplicates().drop(columns=["person_id"])
     logger.info(f"Dropped {before - len(df)} duplicate rows")
 
     null_frac = df.isnull().mean()
