@@ -6,9 +6,8 @@ import time
 from enum import Enum
 from pathlib import Path
 import tempfile
-import os
 
-from azure.ai.ml import MLClient, Input, command
+from azure.ai.ml import MLClient, Input, command, Output
 from azure.ai.ml.entities import Command
 from azure.identity import DefaultAzureCredential
 from rich.console import Console
@@ -42,8 +41,12 @@ def parse_args() -> argparse.Namespace:
     # NOTE: again, we add logic for everything but comment and add iteratively
     p = argparse.ArgumentParser(description="AML Classification Pipeline Orchestrator")
     p.add_argument("--start-from", choices=[g.value for g in Gate], default="data")
-    p.add_argument("--data-uuid", default=None)
     p.add_argument("--run-id", default=None)
+    p.add_argument(
+        "--skip-data",
+        action="store_true",
+        help="Skip the data gate if the asset already exists in AML.",
+    )
     # p.add_argument("--n-trials", type=int, default=CONFIG.get("pipeline", {}).get("n_trials", 30))
     # p.add_argument("--max-epochs", type=int, default=100)
     # p.add_argument("--final-epochs", type=int, default=None)
@@ -85,13 +88,6 @@ def _base_job_kwargs(name: str, description: str) -> dict:
 # ------ Job Builders ---------
 def build_data_job(ml_client: MLClient) -> Command:
 
-    # return command(
-    #     code="./src",  # Set to None
-    #     command="echo 'Hello World'",  # Minimal command
-    #     environment=get_aml_environment(),
-    #     # ...
-    # )
-
     return command(
         **_base_job_kwargs(
             "data-versioning-gate", "Fetch, clean, split, and version data"
@@ -99,14 +95,14 @@ def build_data_job(ml_client: MLClient) -> Command:
         command=(
             "python -m gates.data_versioning_gate "
             "--raw-data ${{inputs.raw_data}} "
-            "--output-base-uri ${{inputs.output_base_uri}} "
-            "--output-uuid-file ${{outputs.uuid_file}}"
+            "--output-asset-name ${{inputs.asset_name}} "
+            "--output-version-path ${{outputs.asset_version}}"  # AML mounts this path
         ),
         inputs={
             "raw_data": Input(type="uri_file", path=CONFIG["data"]["name"]),
-            "output_base_uri": CONFIG["data"]["output_base_uri"],
+            "asset_name": CONFIG["data"]["output_asset_name"],
         },
-        outputs={"uuid_file": {"type": "uri_file", "mode": "rw_mount"}},
+        outputs={"asset_version": Output(type="uri_file", mode="rw_mount")},
     )
 
 
@@ -151,21 +147,29 @@ def submit_and_wait(
 
     console.print(f"[bold green]✔ Gate '{gate_name}' Completed[/bold green]")
     outputs = getattr(current, "outputs", {})
-    return {"status": status, "outputs": outputs}
+    return {"status": status, "outputs": outputs, "job_name": current.name}
 
 
-def read_output_string(ml_client: MLClient, job_outputs: dict, key: str) -> str | None:
+def read_output_string(
+    ml_client: MLClient, job_name: str, job_outputs: dict, key: str
+) -> str | None:
     """Download a uri_file output and return its text content."""
     try:
         output = job_outputs.get(key)
-        if output and hasattr(output, "path"):
-            # Download via SDK
-            with tempfile.TemporaryDirectory() as tmp:
-                local = os.path.join(tmp, "output.txt")
-                ml_client.jobs.download(
-                    name=output.name, output_name=key, download_path=tmp
-                )
-                return Path(local).read_text().strip()
+        if output is None:
+            log.warning("Output '%s' not found in job outputs", key)
+            return None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ml_client.jobs.download(name=job_name, output_name=key, download_path=tmp)
+            # AML downloads to <tmp>/named-outputs/<key>/<filename>
+            output_dir = Path(tmp) / "named-outputs" / key
+            files = list(output_dir.iterdir())
+            if not files:
+                log.warning("No files found in output '%s'", key)
+                return None
+            return files[0].read_text().strip()
+
     except Exception as exc:
         log.warning("Could not read output '%s': %s", key, exc)
     return None
@@ -174,12 +178,8 @@ def read_output_string(ml_client: MLClient, job_outputs: dict, key: str) -> str 
 def main() -> None:
     args = parse_args()
     ml_client = get_client()
-    # data = ml_client.data.get(name="sleep_data", label="latest")
-    # print(data)
-    # print(data.path)
-    # print(data.type)
+
     # State accumulated across gates
-    data_uuid: str | None = args.data_uuid
     mlflow_run_id: str | None = args.run_id
     model_version: int | None = None
 
@@ -203,26 +203,30 @@ def main() -> None:
 
     try:
         # ── Gate 1: Data Versioning ───────────────────────────────────────────
-        if Gate.DATA in active_gates and data_uuid is None:
-            job = build_data_job(ml_client)
-            result = submit_and_wait(ml_client, job, "Data Versioning", args.dry_run)
-            if not args.dry_run:
-                # The UUID is written to the output file by the gate script
-                data_uuid = read_output_string(
-                    ml_client, result["outputs"], "uuid_file"
+        if Gate.DATA in active_gates:
+            asset_name = CONFIG["data"]["output_asset_name"]
+            if args.skip_data:
+                console.print(
+                    f"[dim]⏭ Skipping data gate — asset '{asset_name}' already exists.[/dim]"
                 )
-                if not data_uuid:
-                    raise RuntimeError("Data versioning gate did not produce a UUID.")
+                data_asset_version = "1"
             else:
-                data_uuid = "dry-run-uuid"
-            console.print(f"  [bold]Data UUID:[/bold] {data_uuid}")
-
-        elif data_uuid:
-            console.print(
-                f"[dim]Skipping data gate — using provided UUID: {data_uuid}[/dim]"
-            )
-
-        assert data_uuid, "data_uuid must be set before drift gate"
+                job = build_data_job(ml_client)
+                result = submit_and_wait(
+                    ml_client, job, "Data Versioning", args.dry_run
+                )
+                data_asset_version = (
+                    read_output_string(
+                        ml_client,
+                        result["job_name"],
+                        result["outputs"],
+                        "asset_version",
+                    )
+                    or "latest"
+                )
+                console.print(
+                    f"  Data asset version: [bold]{data_asset_version}[/bold]"
+                )
 
     except RuntimeError as exc:
         console.print(
@@ -234,7 +238,7 @@ def main() -> None:
     console.print(
         Panel(
             f"[bold green]Pipeline complete[/bold green]\n"
-            f"  Data UUID    : {data_uuid}\n"
+            f"  Data Version   : {data_asset_version}\n"
             f"  MLflow Run   : {mlflow_run_id}\n"
             f"  Model Version: {model_version or 'not promoted'}",
             title="✔ SUCCESS",
