@@ -25,14 +25,14 @@ CONFIG: dict = json.loads((ROOT / "config.json").read_text())
 # ------ Gating -------
 class Gate(Enum):
     DATA = "data"
-    # DRIFT = "drift"
+    DRIFT = "drift"
     # FIT = "fit"
     # PROMOTE = "promote"
     # DEPLOY = "deploy"
 
 
 # More gates will go here, but will happen iteratively as things are built out
-GATE_ORDER = [Gate.DATA]
+GATE_ORDER = [Gate.DATA, Gate.DRIFT]
 
 
 # -------- Arg parsing -------
@@ -41,12 +41,8 @@ def parse_args() -> argparse.Namespace:
     # NOTE: again, we add logic for everything but comment and add iteratively
     p = argparse.ArgumentParser(description="AML Classification Pipeline Orchestrator")
     p.add_argument("--start-from", choices=[g.value for g in Gate], default="data")
+    p.add_argument("--data-version", default=None)
     p.add_argument("--run-id", default=None)
-    p.add_argument(
-        "--skip-data",
-        action="store_true",
-        help="Skip the data gate if the asset already exists in AML.",
-    )
     # p.add_argument("--n-trials", type=int, default=CONFIG.get("pipeline", {}).get("n_trials", 30))
     # p.add_argument("--max-epochs", type=int, default=100)
     # p.add_argument("--final-epochs", type=int, default=None)
@@ -103,6 +99,27 @@ def build_data_job(ml_client: MLClient) -> Command:
             "asset_name": CONFIG["data"]["output_asset_name"],
         },
         outputs={"asset_version": Output(type="uri_file", mode="rw_mount")},
+    )
+
+
+def build_drift_job(data_asset_version: str) -> Command:
+    return command(
+        **_base_job_kwargs(
+            "drift-detection-gate", "Statistical drift check against baseline"
+        ),
+        command=(
+            "python -m gates.drift_detection_gate "
+            "--new-data-version ${{inputs.training_asset}} "
+            "--gold-data-version ${{inputs.gold_data}}"
+        ),
+        inputs={
+            "gold_data": Input(type="uri_file", path=CONFIG["data"]["name"]),
+            "training_asset": Input(
+                type="uri_file",
+                path=str(CONFIG["data"]["output_asset_name"])
+                + f":{data_asset_version}",
+            ),
+        },
     )
 
 
@@ -205,11 +222,11 @@ def main() -> None:
         # ── Gate 1: Data Versioning ───────────────────────────────────────────
         if Gate.DATA in active_gates:
             asset_name = CONFIG["data"]["output_asset_name"]
-            if args.skip_data:
+            if args.data_version:
                 console.print(
                     f"[dim]⏭ Skipping data gate — asset '{asset_name}' already exists.[/dim]"
                 )
-                data_asset_version = "1"
+                data_asset_version = args.data_version
             else:
                 job = build_data_job(ml_client)
                 result = submit_and_wait(
@@ -224,9 +241,15 @@ def main() -> None:
                     )
                     or "latest"
                 )
+
                 console.print(
                     f"  Data asset version: [bold]{data_asset_version}[/bold]"
                 )
+
+        # --- Gate 2: Drift Detection ---------------
+        if Gate.DRIFT in active_gates:
+            job = build_drift_job(data_asset_version)
+            submit_and_wait(ml_client, job, "Drift Detection", args.dry_run)
 
     except RuntimeError as exc:
         console.print(
@@ -237,11 +260,11 @@ def main() -> None:
     # ── Summary ───────────────────────────────────────────────────────────────
     console.print(
         Panel(
-            f"[bold green]Pipeline complete[/bold green]\n"
-            f"  Data Version   : {data_asset_version}\n"
-            f"  MLflow Run   : {mlflow_run_id}\n"
-            f"  Model Version: {model_version or 'not promoted'}",
-            title="✔ SUCCESS",
+            "[bold green]Pipeline complete[/bold green]\n"
+            # f"  Data Version   : {data_asset_version}\n"
+            # f"  MLflow Run   : {mlflow_run_id}\n"
+            # f"  Model Version: {model_version or 'not promoted'}",
+            # title="✔ SUCCESS",
         )
     )
 
