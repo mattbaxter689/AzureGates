@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn import set_config
 import logging
+from pathlib import Path
 
 set_config(transform_output="pandas")
 
@@ -18,6 +19,22 @@ def infer_schema(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     cat_cols = df[feature_cols].select_dtypes(exclude=[np.number]).columns.tolist()
 
     return num_cols, cat_cols
+
+
+def load_data(file_path: str) -> pd.DataFrame | tuple[pd.DataFrame, ...]:
+    """
+    Load data from an AzureML asset location.
+    If the path is a folder, returns a tuple of DataFrames (one per CSV file).
+    If the path is a file, returns a single DataFrame.
+    """
+    data_path = Path(file_path)
+
+    if data_path.is_dir():
+        order = ["train", "val", "test"]
+        files = {f.stem: f for f in data_path.glob("*.csv")}
+        return tuple(pd.read_csv(files[name]) for name in order if name in files)
+
+    return pd.read_csv(data_path)
 
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:

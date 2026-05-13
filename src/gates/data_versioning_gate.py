@@ -1,11 +1,16 @@
 import argparse
 import logging
 from pathlib import Path
-import pandas as pd
 
 from utils.logging_utils import setup_logging
 from utils.asset_utils import get_ml_client, register_dataframes_as_asset
-from data.preprocessing import clean, compute_baseline_stats, split, infer_schema
+from data.preprocessing import (
+    clean,
+    compute_baseline_stats,
+    split,
+    infer_schema,
+    load_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +44,7 @@ def run(args: argparse.Namespace) -> str:
     setup_logging()
 
     # Step 1: Load data asset ----------------
-    data_path = Path(args.raw_data)
-    logger.info(f"Fetching data asset from path: {data_path}")
-    df = pd.read_csv(data_path)
+    df = load_data(args.raw_data)
     logger.info(f"Data shape: {df.shape}")
 
     # Step 2: Clean data ---------------------
