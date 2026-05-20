@@ -10,6 +10,7 @@ import tempfile
 from azure.ai.ml import MLClient, Input, command, Output
 from azure.ai.ml.entities import Command
 from azure.identity import DefaultAzureCredential
+from gates import drift_detection_gate
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -110,7 +111,8 @@ def build_drift_job(data_asset_version: str) -> Command:
         command=(
             "python -m gates.drift_detection_gate "
             "--new-data-version ${{inputs.training_asset}} "
-            "--gold-data-version ${{inputs.gold_data}}"
+            "--gold-data-version ${{inputs.gold_data}} "
+            "--drift-output-path ${{outputs.drift_output}}"
         ),
         inputs={
             "gold_data": Input(type="uri_file", path=CONFIG["data"]["name"]),
@@ -120,6 +122,7 @@ def build_drift_job(data_asset_version: str) -> Command:
                 + f":{data_asset_version}",
             ),
         },
+        outputs={"drift_output": Output(type="uri_file", mode="rw_mount")},
     )
 
 
@@ -249,7 +252,10 @@ def main() -> None:
         # --- Gate 2: Drift Detection ---------------
         if Gate.DRIFT in active_gates:
             job = build_drift_job(data_asset_version)
-            submit_and_wait(ml_client, job, "Drift Detection", args.dry_run)
+            result = submit_and_wait(ml_client, job, "Drift Detection", args.dry_run)
+            drift_detected = read_output_string(
+                ml_client, result["job_name"], result["outputs"], "drift_output"
+            )
 
     except RuntimeError as exc:
         console.print(
