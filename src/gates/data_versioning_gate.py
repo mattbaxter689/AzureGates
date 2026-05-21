@@ -1,9 +1,10 @@
 import argparse
 import logging
 from pathlib import Path
+import mlflow
+import json
 
-from utils.logging_utils import setup_logging
-from utils.asset_utils import get_ml_client, register_dataframes_as_asset
+from utils.logging_utils import setup_logging, configure_mlflow
 from data.preprocessing import (
     clean,
     compute_baseline_stats,
@@ -24,13 +25,7 @@ def parse_args() -> argparse.Namespace:
         help="Mounted input path to raw dataset (Azure ML uri_folder)",
     )
     parser.add_argument(
-        "--output-asset-name",
-        type=str,
-        default="modelling_assets",
-        help="Name of the created data asset containing train, test, and validation data",
-    )
-    parser.add_argument(
-        "--output-version-path",
+        "--output-training-path",
         type=str,
         required=True,
         help="Path to write the registered asset version number to",
@@ -42,36 +37,49 @@ def parse_args() -> argparse.Namespace:
 def run(args: argparse.Namespace) -> str:
 
     setup_logging()
+    configure_mlflow()
 
     # Step 1: Load data asset ----------------
     df = load_data(args.raw_data)
     logger.info(f"Data shape: {df.shape}")
 
+    mlflow.set_tag("gate", "data-versioning")
+
     # Step 2: Clean data ---------------------
     df_clean = clean(df)
     logger.info(f"Cleaned data shape: {df_clean.shape}")
+    mlflow.log_metric("raw_rows", len(df))
+    mlflow.log_metric("clean_rows", len(df_clean))
 
     # Step 3: Split Data ---------------------
     train_df, val_df, test_df = split(df_clean)
+    mlflow.log_metric("train_rows", len(train_df))
+    mlflow.log_metric("val_rows", len(val_df))
+    mlflow.log_metric("test_rows", len(test_df))
 
     # Step 4: Compute and Log Baselines:
     num_cols, _ = infer_schema(df_clean)
-    logger.info(f"Baseline Stats: {compute_baseline_stats(df_clean, num_cols)}")
+    baseline = compute_baseline_stats(df_clean, num_cols)
+    mlflow.log_dict(baseline, "baseline/baseline.json")
+    logger.info(f"Baseline Stats: {baseline}")
 
     # Step 5: Upload Processed Splits to Path
-    dataframes = {"train.csv": train_df, "test.csv": test_df, "validation.csv": val_df}
-    ml_client = get_ml_client()
-    registered = register_dataframes_as_asset(
-        ml_client,
-        dataframes,
-        name=args.output_asset_name,
-        description="Cleaned data for modelling purposes",
-    )
     # Write version to output file for the orchestrator to read
-    output_path = Path(args.output_version_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(str(registered.version))
-    logger.info(f"Wrote asset version {registered.version} to {output_path}")
+    output_path = Path(args.output_training_path)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    train_df.to_csv(output_path / "train.csv", index=False)
+    val_df.to_csv(output_path / "validation.csv", index=False)
+    test_df.to_csv(output_path / "test.csv", index=False)
+
+    # add baseline data to this as well
+    with open(output_path / "baseline.json", "w") as f:
+        json.dump(baseline, f)
+
+    logger.info(f"Wrote splits and metadata to {output_path}")
+
+    mlflow.set_tag("gate.status", "PASSED")
+    logger.info("Data versioning gate complete")
 
 
 def main() -> None:

@@ -1,11 +1,11 @@
 import argparse
 import logging
-import sys
 from pathlib import Path
+import mlflow
 import numpy as np
 from scipy import stats
-from utils.logging_utils import setup_logging
-from data.preprocessing import load_data, compute_baseline_stats, infer_schema, clean
+from utils.logging_utils import setup_logging, configure_mlflow
+from data.preprocessing import load_data, infer_schema, load_baseline_data
 
 logger = logging.getLogger(__name__)
 
@@ -72,29 +72,28 @@ def parse_args() -> argparse.Namespace:
 
 def run(args: argparse.Namespace) -> bool:
     setup_logging()
+    configure_mlflow()
+    mlflow.set_tag("gate", "drift-detection")
+
+    baseline_stats = load_baseline_data(args.new_data_version)
+    logger.info(f"Baseline data: {baseline_stats}")
 
     # Step 1: Load data asset ----------------
-    baseline_dirty = load_data(args.gold_data_version)
-    logger.info(f"Baseline Data shape: {baseline_dirty.shape}")
-
     train, _ = load_data(args.new_data_version)
     logger.info(f"New Data Shape: {train.shape}")
 
     logger.info("Inferring schema from baseline")
-    baseline = clean(baseline_dirty)
-    num_cols, _ = infer_schema(baseline)
-
-    # compute baseline stats and get data ready
-    baseline_stats = compute_baseline_stats(baseline, num_cols)
-    logger.info("Baseline statistics calculated")
+    num_cols, _ = infer_schema(train)
 
     # ---- Compute PSI and KS per feature
     drift_results: dict[str, dict] = {}
     drifted_features: list[str] = []
+    missing_columns = 0
 
     for col in num_cols:
         if col not in train.columns:
             logger.warning(f"Column {col} missing from current data - skipping")
+            missing_columns += 1
             continue
 
         current_vals = train[col].dropna().values
@@ -124,9 +123,16 @@ def run(args: argparse.Namespace) -> bool:
         else:
             logger.info(f"Stable: {col} PSI={psi:.4f}")
 
+    mlflow.log_dict(drift_results, "drift_results/drift_results.json")
+
     max_psi = max((r["psi"] for r in drift_results.values()), default=0.0)
     n_drifted = len(drifted_features)
     stable = n_drifted == 0
+
+    mlflow.log_metric("columns_missing", missing_columns)
+    mlflow.log_metric("max_psi", max_psi)
+    mlflow.log_metric("num_drifted_columns", n_drifted)
+    mlflow.log_metric("stability", stable)
 
     if stable:
         logger.info(f"Drift gate PASSED - all features stable (max PSI={max_psi:.4f}")

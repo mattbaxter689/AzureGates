@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn import set_config
 import logging
+import json
 from pathlib import Path
 
 set_config(transform_output="pandas")
@@ -19,6 +20,26 @@ def infer_schema(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     cat_cols = df[feature_cols].select_dtypes(exclude=[np.number]).columns.tolist()
 
     return num_cols, cat_cols
+
+
+def load_baseline_data(file_path: str) -> dict[str, float]:
+    """
+    Load baseline data uploaded from Data Versioning step
+    as part of asset location
+    """
+    data_path = Path(file_path)
+    baseline_path = data_path / "baseline.json"
+
+    if not baseline_path.exists():
+        raise FileNotFoundError(
+            f"Baseline file not found in input path: {baseline_path}"
+        )
+
+    with open(baseline_path, "r") as f:
+        baseline_stats = json.load(f)
+    logger.info("Baseline stats successfully loaded from input mount.")
+
+    return baseline_stats
 
 
 def load_data(file_path: str) -> pd.DataFrame | tuple[pd.DataFrame, ...]:
