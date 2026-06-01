@@ -24,13 +24,13 @@ CONFIG: dict = json.loads((ROOT / "config.json").read_text())
 class Gate(Enum):
     DATA = "data"
     DRIFT = "drift"
-    # FIT = "fit"
+    FIT = "fit"
     # PROMOTE = "promote"
     # DEPLOY = "deploy"
 
 
 # More gates will go here, but will happen iteratively as things are built out
-GATE_ORDER = [Gate.DATA, Gate.DRIFT]
+GATE_ORDER = [Gate.DATA, Gate.DRIFT, Gate.FIT]
 
 
 # -------- Arg parsing -------
@@ -121,6 +121,21 @@ def drift_detection_component() -> Command:
     )
 
 
+def model_training_component() -> Command:
+    return command(
+        **_base_job_kwargs("model-training-gate", "Model fit gate to train new model"),
+        command=(
+            "python -m gates.model_training_gate "
+            "--drift-detected ${{inputs.drift_detected}} "
+            "--training-data ${{inputs.processed_data}}"
+        ),
+        inputs={
+            "processed_data": Input(type="uri_folder"),
+            "drift_detected": Input(type="uri_file"),
+        },
+    )
+
+
 @dsl.pipeline(
     description="Gated classification pipeline",
     experiment_name=CONFIG["pipeline"]["experiment_name"],
@@ -134,6 +149,11 @@ def build_pipeline(raw_data: Input, gold_data: Input):
     drift_step = drift_detection_component()(
         gold_data=gold_data,
         processed_data=data_step.outputs.processed_data,  # wired directly, AML mounts it
+    )
+
+    model_step = model_training_component()(
+        processed_data=data_step.outputs.processed_data,
+        drift_detected=drift_step.outputs.drift_output,
     )
 
     return {"drift_output": drift_step.outputs.drift_output}
