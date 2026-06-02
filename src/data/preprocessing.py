@@ -22,6 +22,23 @@ def infer_schema(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     return num_cols, cat_cols
 
 
+def load_drift_output(file_path: str) -> str:
+    """
+    Load drift output from Drift Detection step
+    to determine model training needed
+    """
+    data_path = Path(file_path)
+    drift_path = data_path / "drift.txt"
+
+    if not drift_path.exists():
+        raise FileNotFoundError(
+            f"Drift output file not found in input path: {drift_path}"
+        )
+    logger.info("Drift output loaded successfully from mount")
+
+    return drift_path.read_text().strip()
+
+
 def load_baseline_data(file_path: str) -> dict[str, float]:
     """
     Load baseline data uploaded from Data Versioning step

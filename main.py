@@ -117,7 +117,7 @@ def drift_detection_component() -> Command:
                 type="uri_folder",
             ),
         },
-        outputs={"drift_output": Output(type="uri_file", mode="rw_mount")},
+        outputs={"drift_output": Output(type="uri_folder", mode="rw_mount")},
     )
 
 
@@ -131,7 +131,7 @@ def model_training_component() -> Command:
         ),
         inputs={
             "processed_data": Input(type="uri_folder"),
-            "drift_detected": Input(type="uri_file"),
+            "drift_detected": Input(type="uri_folder"),
         },
     )
 
@@ -148,10 +148,10 @@ def build_pipeline(raw_data: Input, gold_data: Input):
 
     drift_step = drift_detection_component()(
         gold_data=gold_data,
-        processed_data=data_step.outputs.processed_data,  # wired directly, AML mounts it
+        processed_data=data_step.outputs.processed_data,
     )
 
-    model_step = model_training_component()(
+    model_training_component()(
         processed_data=data_step.outputs.processed_data,
         drift_detected=drift_step.outputs.drift_output,
     )

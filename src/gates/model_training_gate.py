@@ -1,7 +1,8 @@
 import argparse
 import logging
 
-from pathlib import Path
+from data.preprocessing import load_drift_output
+from utils.logging_utils import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +25,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def run(args: argparse.Namespace) -> None:
-    drift_output_path = Path(args.drift_detected)
-    drift_output = drift_output_path.read_text()
-    logger.info(f"Drift output from drift gate: {drift_output}")
+
+    setup_logging()
+
+    result = load_drift_output(args.drift_detected)
+    logger.info(f"Drift output from drift gate: {result}")
 
 
 def main() -> None:
+    logger.info("Parsing arguments")
     args = parse_args()
     run(args)
 

@@ -142,9 +142,9 @@ def run(args: argparse.Namespace) -> bool:
         )
 
     output_path = Path(args.drift_output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text("stable" if stable else "drifted")
-    logger.info(f"Wrote drift result {stable} to {output_path}")
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "drift.txt").write_text("stable" if stable else "drifted")
+    logger.info(f"Wrote drift result to folder: {stable}")
 
 
 def main() -> None:
