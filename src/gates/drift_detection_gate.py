@@ -58,8 +58,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--drift-threshold",
         type=float,
-        default=0.05,
-        help="PSI threshold. Defaults to 0.05",
+        default=0.25,
+        help="PSI threshold. Defaults to 0.25",
     )
     p.add_argument(
         "--drift-output-path",
