@@ -2,6 +2,8 @@
 
 A production-like, gate based MLOps pipeline built on Azure ML SDK v2.
 
+**Please Note** This project is still being developed, and as such, I am updating the documentation as I complete pre-defined phases for development.
+
 ## Architecture Overview
 
 ```
@@ -32,6 +34,10 @@ terraform apply -auto-approve
 Ensure to create a `terraform.tfvars` file to list the secrets for the project
 
 ### 2. Configure Workspace
+
+Create a `config.json` file for your project. This is used only for Azure ML DSL pipeline submission.
+Any of this information is injected directly into the Azure ML job runtime and can be fetched via
+environment variables
 
 ```bash
 cp config.json.example config.json
@@ -79,3 +85,11 @@ is quite powerful and allows us to pass and share information between pipeline j
 
 For this project, we mainly use `URI Files` and `URI Folders` for data assets, but other asset types exist
 like model assets, compute assets, etc. The list of assets and their types can be found [in the official documentation](https://learn.microsoft.com/en-us/azure/machine-learning/concept-azure-machine-learning-v2?view=azureml-api-2&tabs=sdk#data)
+
+## Troubleshooting / Common Issues
+
+In the early stages of development, so far I have experience some issues that caused me a decent amount of pain.
+
+- **Issues Creating Data Assets**: This caused me a great headache early on. It simply boils down to not having the `Storage Blob Data Contributor` IAM role attached to your compute target. This is easier to apply with terraform, so if you run into the issue, the solution for me was to run `terraform destroy` and re-apply the plan to get what I needed
+- **Issues Submitting Jobs**: This is something else that caused me a lot of pain. Like the data asset issue, you need the `AzureML Data Scientist` IAM role attached to your compute target as well. This is what is running the jobs and needs additional access to the workspace. This one took an embarrassing amount of time to figure out.
+- **Azure ML Job Submission Taking Too Long**: This can happen when you try to submit an Azure ML job and it tries to upload your entire codebase as part of the job execution. You can simply get around this by creating an `.amlignore` file and only uploading exactly what is needed. Once this was fixed, this has not been an issue since

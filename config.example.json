@@ -1,0 +1,22 @@
+{
+  "workspace": {
+    "subscription_id": "<your subscription_id>",
+    "resource_group": "<your resource_group>",
+    "workspace_name": "<your workspace_name>"
+  },
+  "environment": {
+    "name": "<your environment name in Azure ML>",
+    "version": "<environment version>"
+
+  },
+  "compute": {
+    "training_cluster": "<name of your compute cluster>"
+  },
+  "pipeline": {
+    "experiment_name": "<the name you wish to give your DSL pipeline runs>"
+  },
+  "data": {
+    "name": "<your raw data asset name. Will look like azureml:raw_data:version>",
+    "output_asset_name": "<name for your transformed data>"
+  }
+}
