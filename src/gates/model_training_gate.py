@@ -1,7 +1,12 @@
 import argparse
 import logging
 
-from data.preprocessing import load_drift_output
+from data.preprocessing import (
+    load_drift_output,
+    encode_features,
+    infer_schema,
+    load_data,
+)
 from utils.logging_utils import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -30,6 +35,36 @@ def run(args: argparse.Namespace) -> None:
 
     result = load_drift_output(args.drift_detected)
     logger.info(f"Drift output from drift gate: {result}")
+
+    if result == "drifted":
+
+        train_df, val_df, test_df = load_data(args.training_data)
+        num_cols, cat_cols = infer_schema(train_df)
+        logger.info(val_df)
+
+        train_tf, train_target, transformer, label_encoder = encode_features(
+            train_df, num_cols, cat_cols, fit=True
+        )
+        val_tf, val_target, _, _ = encode_features(
+            val_df,
+            num_cols,
+            cat_cols,
+            fit=False,
+            transformer=transformer,
+            label_encoder=label_encoder,
+        )
+        test_tf, val_target, _, _ = encode_features(
+            test_df,
+            num_cols,
+            cat_cols,
+            fit=False,
+            transformer=transformer,
+            label_encoder=label_encoder,
+        )
+        logger.info(train_tf)
+        logger.info(train_target)
+        logger.info(val_tf)
+        logger.info(val_target)
 
 
 def main() -> None:

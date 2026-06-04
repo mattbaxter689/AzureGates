@@ -2,9 +2,14 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn import set_config
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 import logging
 import json
 from pathlib import Path
+
 
 set_config(transform_output="pandas")
 
@@ -68,9 +73,9 @@ def load_data(file_path: str) -> pd.DataFrame | tuple[pd.DataFrame, ...]:
     data_path = Path(file_path)
 
     if data_path.is_dir():
-        order = ["train", "val", "test"]
-        files = {f.stem: f for f in data_path.glob("*.csv")}
-        return tuple(pd.read_csv(files[name]) for name in order if name in files)
+        order = ["train", "validation", "test"]
+        files = {f.stem: f for f in data_path.glob("*.parquet")}
+        return tuple(pd.read_parquet(files[name]) for name in order if name in files)
 
     return pd.read_csv(data_path)
 
@@ -174,3 +179,66 @@ def compute_baseline_stats(df: pd.DataFrame, num_cols: list[str]) -> dict:
             "n": int(desc["count"]),
         }
     return stats
+
+
+def encode_features(
+    df: pd.DataFrame,
+    num_cols: list[str],
+    cat_cols: list[str],
+    fit: bool = True,
+    transformer: ColumnTransformer | None = None,
+    label_encoder: LabelEncoder | None = None,
+) -> tuple[pd.DataFrame, pd.Series, ColumnTransformer, LabelEncoder]:
+    """
+    Encode categorical columns with OneHotEncoder and scale numeric columns
+    with MinMaxScaler.
+
+    Returns the fitted scalers for transformation on validation and test data
+    """
+    data = df.drop(columns=[TARGET_COL])
+    target = df[TARGET_COL]
+
+    if fit:
+        transformer = create_transform_pipeline(num_cols, cat_cols)
+        label_encoder = LabelEncoder()
+        data_tf = transformer.fit_transform(
+            data,
+        )
+        target_tf = label_encoder.fit_transform(target)
+
+    else:
+        assert transformer is not None
+        assert label_encoder is not None
+
+        data_tf = transformer.transform(data)
+        target_tf = label_encoder.transform(target)
+
+    return data_tf, target_tf, transformer, label_encoder
+
+
+def create_transform_pipeline(
+    num_cols: list[str], cat_cols: list[str]
+) -> ColumnTransformer:
+    """
+    Create the sklearn pipeline for transforming variables. Only for numerical and
+    categorical data
+    """
+
+    numeric_pipeline = Pipeline(
+        [("imputer", SimpleImputer(strategy="median")), ("scaler", MinMaxScaler())]
+    )
+
+    onehot_pipeline = Pipeline(
+        [
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+        ]
+    )
+
+    return ColumnTransformer(
+        transformers=[
+            ("num", numeric_pipeline, num_cols),
+            ("onehot", onehot_pipeline, cat_cols),
+        ],
+        remainder="drop",
+    )
