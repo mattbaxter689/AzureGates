@@ -61,10 +61,6 @@ def run(args: argparse.Namespace) -> None:
             transformer=transformer,
             label_encoder=label_encoder,
         )
-        logger.info(train_tf)
-        logger.info(train_target)
-        logger.info(val_tf)
-        logger.info(val_target)
 
 
 def main() -> None:
