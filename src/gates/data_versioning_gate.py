@@ -68,9 +68,9 @@ def run(args: argparse.Namespace) -> str:
     output_path = Path(args.output_training_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    train_df.to_csv(output_path / "train.csv", index=False)
-    val_df.to_csv(output_path / "validation.csv", index=False)
-    test_df.to_csv(output_path / "test.csv", index=False)
+    train_df.to_parquet(output_path / "train.parquet", index=False)
+    val_df.to_parquet(output_path / "validation.parquet", index=False)
+    test_df.to_parquet(output_path / "test.parquet", index=False)
 
     # add baseline data to this as well
     with open(output_path / "baseline.json", "w") as f:
