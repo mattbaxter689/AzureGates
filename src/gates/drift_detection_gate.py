@@ -79,7 +79,7 @@ def run(args: argparse.Namespace) -> bool:
     logger.info(f"Baseline data: {baseline_stats}")
 
     # Step 1: Load data asset ----------------
-    train, _ = load_data(args.new_data_version)
+    train, _, _ = load_data(args.new_data_version)
     logger.info(f"New Data Shape: {train.shape}")
 
     logger.info("Inferring schema from baseline")
