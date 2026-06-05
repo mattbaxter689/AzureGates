@@ -1,5 +1,6 @@
 import torch
 import pandas as pd
+import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
 
@@ -9,8 +10,16 @@ class SleepDataset(Dataset):
     """
 
     def __init__(self, df: pd.DataFrame, target: pd.Series) -> None:
-        self.X = torch.tensor(df.values, dtype=torch.float32)
-        self.y = torch.tensor(target.values, dtype=torch.long)
+        self.X = torch.tensor(df.to_numpy(dtype=np.float32), dtype=torch.float32)
+
+        if hasattr(target, "to_numpy"):
+            # If it's a pandas Series
+            target_arr = target.to_numpy(dtype=np.int64)
+        else:
+            # If it's already a numpy array
+            target_arr = target.astype(np.int64)
+
+        self.y = torch.tensor(target_arr, dtype=torch.long)
 
     def __len__(self) -> int:
         return len(self.X)
