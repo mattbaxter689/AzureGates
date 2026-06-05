@@ -40,23 +40,22 @@ def run(args: argparse.Namespace) -> None:
 
     if result == "drifted":
 
-        train_df, val_df, test_df = load_data(args.training_data)
-        num_cols, cat_cols = infer_schema(train_df)
-        logger.info(val_df)
+        train, val, test = load_data(args.training_data)
+        num_cols, cat_cols = infer_schema(train)
 
         train_tf, train_target, transformer, label_encoder = encode_features(
-            train_df, num_cols, cat_cols, fit=True
+            train, num_cols, cat_cols, fit=True
         )
         val_tf, val_target, _, _ = encode_features(
-            val_df,
+            val,
             num_cols,
             cat_cols,
             fit=False,
             transformer=transformer,
             label_encoder=label_encoder,
         )
-        test_tf, val_target, _, _ = encode_features(
-            test_df,
+        test_tf, test_target, _, _ = encode_features(
+            test,
             num_cols,
             cat_cols,
             fit=False,
@@ -64,12 +63,12 @@ def run(args: argparse.Namespace) -> None:
             label_encoder=label_encoder,
         )
 
-        num_classes = train_df[TARGET_COL].nunique()
+        num_classes = train[TARGET_COL].nunique()
 
         study = run_tuning(
-            train_df,
+            train_tf,
             train_target,
-            val_df,
+            val_tf,
             val_target,
             num_classes=num_classes,
             batch_size=32,
