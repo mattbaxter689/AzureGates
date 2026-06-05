@@ -73,20 +73,17 @@ class SleepClassifier(pl.LightningModule):
         )
         return F.cross_entropy(logits, targets, weight=weights)
 
-    def training_step(
-        self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
-    ) -> torch.Tensor:
+    def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
         loss = self._loss(logits, y)
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log(
-            "train_acc",
-            self.train_acc(logits, y),
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-        )
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.train_acc.update(logits, y)  # accumulate, don't log yet
+        return loss
+
+    def on_train_epoch_end(self):
+        self.log("train_acc", self.train_acc.compute().item(), prog_bar=True)
+        self.train_acc.reset()
 
     def validation_step(
         self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
