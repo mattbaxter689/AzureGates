@@ -6,7 +6,9 @@ from data.preprocessing import (
     encode_features,
     infer_schema,
     load_data,
+    TARGET_COL,
 )
+from model.tuner import run_tuning
 from utils.logging_utils import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -61,6 +63,19 @@ def run(args: argparse.Namespace) -> None:
             transformer=transformer,
             label_encoder=label_encoder,
         )
+
+        num_classes = train_df[TARGET_COL].nunique()
+
+        study = run_tuning(
+            train_df,
+            train_target,
+            val_df,
+            val_target,
+            num_classes=num_classes,
+            batch_size=32,
+            max_epochs=10,
+        )
+        logger.info(f"Best params: {study.best_params}")
 
 
 def main() -> None:
