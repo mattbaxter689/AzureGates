@@ -1,6 +1,6 @@
 from typing import Any
 import logging
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -37,7 +37,7 @@ class SleepClassifier(pl.LightningModule):
         self.weight_decay = weight_decay
 
         self.net = nn.Sequential(
-            [
+            *[
                 # 2 layer model for now
                 nn.Linear(input_dim, hidden_dim),
                 nn.BatchNorm1d(hidden_dim),
@@ -121,5 +121,5 @@ class SleepClassifier(pl.LightningModule):
 
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": scheduler, "monitor": "val_loss"},
+            "lr_scheduler": {"scheduler": scheduler},
         }

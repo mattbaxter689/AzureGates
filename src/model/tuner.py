@@ -2,10 +2,10 @@ import os
 import mlflow
 import logging
 import pandas as pd
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from optuna.integration import PyTorchLightningPruningCallback
-from pytorch_lightning.callbacks import EarlyStopping
-from pytorch_lightning.loggers.mlflow import MLFlowLogger
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.loggers.mlflow import MLFlowLogger
 import optuna
 from typing import Callable
 
@@ -14,6 +14,9 @@ from data.dataset import make_dataloaders
 
 PARENT_RUN_ID = os.getenv("MLFLOW_RUN_ID")
 TRACKING_URI = mlflow.get_tracking_uri()
+
+mlflow.pytorch.autolog(disable=True)
+mlflow.autolog(disable=True)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,17 @@ def make_objective(
                 lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
                 weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
 
+                mlflow.log_params(
+                    {
+                        "hidden_dim": hidden_dim,
+                        "dropout": dropout,
+                        "lr": lr,
+                        "weight_decay": weight_decay,
+                        "trial_number": trial.number,
+                    }
+                )
+                mlflow.set_tag("mlflow.runName", f"trial_{trial.number}")
+
                 train_loader, val_loader, _ = make_dataloaders(
                     train_df,
                     train_target,
@@ -78,7 +92,7 @@ def make_objective(
                 trainer = pl.Trainer(
                     max_epochs=max_epochs,
                     accelerator="auto",
-                    devices="auto",
+                    devices=1,
                     enable_progress_bar=False,
                     enable_model_summary=False,
                     logger=mlflow_logger,
@@ -97,7 +111,7 @@ def make_objective(
                 val_f1 = trainer.callback_metrics.get("val_f1", 0.0)
                 return float(val_f1)
 
-            return objective
+    return objective
 
 
 def run_tuning(
@@ -116,7 +130,7 @@ def run_tuning(
 
     study = optuna.create_study(
         direction="maximize",
-        study_name="sleep-classificatin-tuner",
+        study_name="sleep-classification-tuner",
         pruner=optuna.pruners.MedianPruner(n_startup_trials=1),
         sampler=optuna.samplers.TPESampler(seed=42),
     )
