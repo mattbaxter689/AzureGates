@@ -151,7 +151,7 @@ def build_pipeline(raw_data: Input, gold_data: Input):
         processed_data=data_step.outputs.processed_data,
     )
 
-    model_training_component()(
+    model_step = model_training_component()(
         processed_data=data_step.outputs.processed_data,
         drift_detected=drift_step.outputs.drift_output,
     )
