@@ -28,3 +28,8 @@ variable "cpu_cluster_name" {
   description = "The name of the CPU training cluster on Azure"
   type        = string
 }
+
+variable "gpu_cluster_name" {
+  description = "The name of the GPU training cluster on Azure"
+  type        = string
+}

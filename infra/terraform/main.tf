@@ -118,6 +118,8 @@ resource "azurerm_machine_learning_workspace" "aml" {
 # -------------------------------
 # Compute Cluster
 # -------------------------------
+
+# CPU
 resource "azurerm_machine_learning_compute_cluster" "cpu" {
   name                          = var.cpu_cluster_name
   location                      = azurerm_resource_group.ml.location
@@ -138,6 +140,28 @@ resource "azurerm_machine_learning_compute_cluster" "cpu" {
   depends_on = [azurerm_machine_learning_workspace.aml]
 }
 
+# GPU
+resource "azurerm_machine_learning_compute_cluster" "gpu" {
+  name                          = var.gpu_cluster_name
+  location                      = azurerm_resource_group.ml.location
+  machine_learning_workspace_id = azurerm_machine_learning_workspace.aml.id
+  vm_size                       = "Standard_NC4as_T4_v3"
+  vm_priority                   = "Dedicated"
+
+  scale_settings {
+    min_node_count                       = 0
+    max_node_count                       = 1
+    scale_down_nodes_after_idle_duration = "PT10M"
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  depends_on = [azurerm_machine_learning_workspace.aml]
+}
+
+
 # -------------------------------
 # Explicit Role Assignments
 # (Only those NOT managed automatically by the Workspace)
@@ -150,6 +174,14 @@ resource "azurerm_role_assignment" "compute_storage_access" {
   scope                = azurerm_storage_account.blob.id
 
   depends_on = [azurerm_machine_learning_compute_cluster.cpu]
+}
+
+resource "azurerm_role_assignment" "gpu_compute_storage_access" {
+  principal_id         = azurerm_machine_learning_compute_cluster.gpu.identity[0].principal_id
+  role_definition_name = "Storage Blob Data Contributor"
+  scope                = azurerm_storage_account.blob.id
+
+  depends_on = [azurerm_machine_learning_compute_cluster.gpu]
 }
 
 # Workspace — AzureML Data Scientist
