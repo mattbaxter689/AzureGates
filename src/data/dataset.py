@@ -46,10 +46,12 @@ def make_dataloaders(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
     )
-    train_loadder = DataLoader(
+    train_loader = DataLoader(
         SleepDataset(train_df, train_target), shuffle=True, **kwargs
     )
-    val_loader = DataLoader(SleepDataset(val_df, val_target), shuffle=True, **kwargs)
-    test_loader = DataLoader(SleepDataset(test_df, test_target), shuffle=True, **kwargs)
+    val_loader = DataLoader(SleepDataset(val_df, val_target), shuffle=False, **kwargs)
+    test_loader = DataLoader(
+        SleepDataset(test_df, test_target), shuffle=False, **kwargs
+    )
 
-    return train_loadder, val_loader, test_loader
+    return train_loader, val_loader, test_loader
