@@ -71,8 +71,7 @@ def run(args: argparse.Namespace) -> None:
             val_tf,
             val_target,
             num_classes=num_classes,
-            batch_size=32,
-            max_epochs=10,
+            max_epochs=20,
         )
         logger.info(f"Best params: {study.best_params}")
 

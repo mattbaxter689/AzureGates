@@ -58,7 +58,7 @@ def get_aml_environment() -> str:
 
 
 def get_compute() -> str:
-    return CONFIG["compute"]["training_cluster"]
+    return CONFIG["compute"]["training_cluster_gpu"]
 
 
 # ------ Base Job Config ----------

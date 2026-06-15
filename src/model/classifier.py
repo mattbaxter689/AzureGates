@@ -36,24 +36,28 @@ class SleepClassifier(pl.LightningModule):
         self.dropout = dropout
         self.weight_decay = weight_decay
 
-        self.net = nn.Sequential(
-            *[
-                # 2 layer model for now
-                nn.Linear(input_dim, hidden_dim),
-                nn.BatchNorm1d(hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                # final block
-                nn.Linear(hidden_dim, hidden_dim // 2),
-                nn.BatchNorm1d(hidden_dim // 2),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                # output layer
-                nn.Linear(hidden_dim // 2, num_classes),
-            ]
+        # Inpute layer
+        self.input_layer = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
         )
 
-        self._class_weights = class_weights
+        # Residual block for skip connection
+        self.res_block = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+
+        # Final classification output layer
+        self.output_layer = nn.Linear(hidden_dim, num_classes)
+        if class_weights is not None:
+            self.register_buffer("class_weights", class_weights)
+        else:
+            self.class_weights = None
 
         metric_kwargs = dict(num_classes=num_classes, average="macro")
         self.train_acc = MulticlassAccuracy(**metric_kwargs)
@@ -63,21 +67,21 @@ class SleepClassifier(pl.LightningModule):
         self.test_f1 = MulticlassF1Score(**metric_kwargs)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x)
+        h1 = self.input_layer(x)
+        h2 = h1 + self.res_block(h1)
+
+        return self.output_layer(h2)
 
     def _loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        weights = (
-            self._class_weights.to(self.device)
-            if self._class_weights is not None
-            else None
+        return F.cross_entropy(
+            logits, targets, weight=self.class_weights, label_smoothing=0.1
         )
-        return F.cross_entropy(logits, targets, weight=weights)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
         loss = self._loss(logits, y)
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.train_acc.update(logits, y)  # accumulate, don't log yet
         return loss
 

@@ -27,7 +27,6 @@ def make_objective(
     val_df: pd.DataFrame,
     val_target: pd.Series,
     num_classes: int,
-    batch_size: int,
     max_epochs: int = 20,
 ) -> Callable:
     """
@@ -47,7 +46,8 @@ def make_objective(
             ) as child_run:
 
                 # sample the parameters
-                hidden_dim = trial.suggest_categorical("hidden_dim", [32, 64])
+                hidden_dim = trial.suggest_categorical("hidden_dim", [64, 128, 256])
+                batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
                 dropout = trial.suggest_float("dropout", 0.1, 0.5)
                 lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
                 weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
@@ -55,6 +55,7 @@ def make_objective(
                 mlflow.log_params(
                     {
                         "hidden_dim": hidden_dim,
+                        "batch_size": batch_size,
                         "dropout": dropout,
                         "lr": lr,
                         "weight_decay": weight_decay,
@@ -71,7 +72,7 @@ def make_objective(
                     val_df,
                     val_target,
                     batch_size=batch_size,
-                    num_workers=0,
+                    num_workers=3,
                 )
 
                 model = SleepClassifier(
@@ -120,9 +121,8 @@ def run_tuning(
     val_df: pd.DataFrame,
     val_target: pd.Series,
     num_classes: int,
-    batch_size: int,
-    max_epochs: int = 20,
-    n_trials: int = 3,
+    max_epochs: int = 25,
+    n_trials: int = 10,
 ) -> optuna.Study:
     """
     Function to run the hyperparameter tuning on optuna
@@ -136,7 +136,7 @@ def run_tuning(
     )
 
     objective = make_objective(
-        train_df, train_target, val_df, val_target, num_classes, batch_size, max_epochs
+        train_df, train_target, val_df, val_target, num_classes, max_epochs
     )
 
     logger.info(f"Starting Optuna tuning: {n_trials}")
