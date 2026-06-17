@@ -8,9 +8,19 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.loggers.mlflow import MLFlowLogger
 import optuna
 from typing import Callable
+from datetime import datetime
+import gc
+import torch
 
 from model.classifier import SleepClassifier
 from data.dataset import make_dataloaders
+from model.callbacks import (
+    make_checkpoint,
+    make_early_stopping,
+    MlflowArtifactCallback,
+)
+
+os.environ["MLFLOW_DISABLE_LOGGED_MODELS"] = "true"
 
 PARENT_RUN_ID = os.getenv("MLFLOW_RUN_ID")
 TRACKING_URI = mlflow.get_tracking_uri()
@@ -34,47 +44,41 @@ def make_objective(
     """
 
     def objective(trial: optuna.Trial) -> float:
-        mlflow.set_tracking_uri(TRACKING_URI)
 
-        with mlflow.start_run(run_id=PARENT_RUN_ID) as parent_run:
-            current_experiment_id = parent_run.info.experiment_id
+        # CUDA errors requires this for my GPU training
+        gc.collect()
+        torch.cuda.empty_cache()
 
-            with mlflow.start_run(
-                run_name=f"trial_{trial.number}",
-                experiment_id=current_experiment_id,
-                nested=True,
-            ) as child_run:
+        with mlflow.start_run(
+            run_name=f"trial_{trial.number}", nested=True
+        ) as child_run:
+            child_run_id = child_run.info.run_id
 
-                # sample the parameters
-                hidden_dim = trial.suggest_categorical("hidden_dim", [64, 128, 256])
-                batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
-                dropout = trial.suggest_float("dropout", 0.1, 0.5)
-                lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
-                weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
+            # 3. Explicitly force the parent-child relationship for Azure ML's UI
+            if PARENT_RUN_ID:
+                mlflow.set_tag("mlflow.parentRunId", PARENT_RUN_ID)
 
-                mlflow.log_params(
-                    {
-                        "hidden_dim": hidden_dim,
-                        "batch_size": batch_size,
-                        "dropout": dropout,
-                        "lr": lr,
-                        "weight_decay": weight_decay,
-                        "trial_number": trial.number,
-                    }
-                )
-                mlflow.set_tag("mlflow.runName", f"trial_{trial.number}")
+            # Sample the parameters
+            hidden_dim = trial.suggest_categorical("hidden_dim", [64, 128, 256])
+            batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
+            dropout = trial.suggest_float("dropout", 0.1, 0.5)
+            lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
+            weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
 
-                train_loader, val_loader, _ = make_dataloaders(
-                    train_df,
-                    train_target,
-                    val_df,
-                    val_target,
-                    val_df,
-                    val_target,
-                    batch_size=batch_size,
-                    num_workers=3,
-                )
+            mlflow.log_params(trial.params)
 
+            train_loader, val_loader, _ = make_dataloaders(
+                train_df,
+                train_target,
+                val_df,
+                val_target,
+                val_df,
+                val_target,
+                batch_size=batch_size,
+                num_workers=3,
+            )
+
+            try:
                 model = SleepClassifier(
                     input_dim=len(train_df.columns),
                     num_classes=num_classes,
@@ -86,8 +90,10 @@ def make_objective(
 
                 pruning_cb = PyTorchLightningPruningCallback(trial, monitor="val_f1")
                 early_stop = EarlyStopping(monitor="val_f1", mode="max", patience=3)
+
+                # 4. Bind the Lightning logger strictly to this child run ID
                 mlflow_logger = MLFlowLogger(
-                    tracking_uri=TRACKING_URI, run_id=child_run.info.run_id
+                    tracking_uri=mlflow.get_tracking_uri(), run_id=child_run_id
                 )
 
                 trainer = pl.Trainer(
@@ -110,7 +116,15 @@ def make_objective(
                     raise
 
                 val_f1 = trainer.callback_metrics.get("val_f1", 0.0)
+                mlflow.log_metric("final_val_f1", float(val_f1))
+
                 return float(val_f1)
+
+            finally:
+                del model
+                del trainer
+                gc.collect()
+                torch.cuda.empty_cache()
 
     return objective
 
@@ -121,7 +135,7 @@ def run_tuning(
     val_df: pd.DataFrame,
     val_target: pd.Series,
     num_classes: int,
-    max_epochs: int = 25,
+    max_epochs: int = 50,
     n_trials: int = 10,
 ) -> optuna.Study:
     """
@@ -147,3 +161,77 @@ def run_tuning(
     )
 
     return study
+
+
+def final_training_run(
+    train_df: pd.DataFrame,
+    train_target: pd.Series,
+    val_df: pd.DataFrame,
+    val_target: pd.Series,
+    test_df: pd.DataFrame,
+    test_target: pd.Series,
+    num_classes: int,
+    best_params: dict[str, str | int | float],
+    scaler_path: str,
+    encoder_path: str,
+    ckpt_dir: str = "checkpoints",
+    max_epochs: int = 50,
+) -> tuple[str, float]:
+    """
+    Train final model using best parameters from Optuna
+    trials.
+    """
+
+    train_loader, val_loader, test_loader = make_dataloaders(
+        train_df,
+        train_target,
+        val_df,
+        val_target,
+        test_df,
+        test_target,
+        best_params["batch_size"],
+        num_workers=2,
+    )
+
+    model = SleepClassifier(
+        input_dim=len(train_df.columns),
+        num_classes=num_classes,
+        hidden_dim=best_params["hidden_dim"],
+        lr=best_params["lr"],
+        dropout=best_params["dropout"],
+        weight_decay=best_params["weight_decay"],
+    )
+
+    ckpt_cb = make_checkpoint(ckpt_dir)
+    early_stopping = make_early_stopping(patience=5)
+    artifact_db = MlflowArtifactCallback(
+        ckpt_cb, scaler_path=str(scaler_path), label_encoder_path=str(encoder_path)
+    )
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    with mlflow.start_run(run_name=f"final_training-{timestamp}") as run:
+        mlflow.log_params(best_params)
+        mlflow.set_tag("run_type", "final_production_candidate")
+
+        trainer = pl.Trainer(
+            max_epochs=max_epochs,
+            accelerator="auto",
+            devices=1,
+            callbacks=[ckpt_cb, early_stopping, artifact_db],
+            logger=False,
+            enable_progress_bar=True,
+        )
+        trainer.fit(model, train_loader, val_loader)
+
+        test_results = trainer.test(model, test_loader, verbose=False)
+        if test_results:
+            test_metrics = test_results[0]
+
+            mlflow.log_metrics(test_metrics)
+            logger.info(f"Testing complete. Metrics: {test_metrics}")
+
+        best_val_f1 = float(trainer.callback_metrics.get("val_f1", 0.0))
+        mlflow.log_metric("best_val_f1", best_val_f1)
+
+        run_id = run.info.run_id
+    return run_id, best_val_f1

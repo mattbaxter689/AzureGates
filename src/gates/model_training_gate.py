@@ -1,5 +1,9 @@
 import argparse
 import logging
+import tempfile
+from pathlib import Path
+
+import joblib
 
 from data.preprocessing import (
     load_drift_output,
@@ -8,7 +12,7 @@ from data.preprocessing import (
     load_data,
     TARGET_COL,
 )
-from model.tuner import run_tuning
+from model.tuner import run_tuning, final_training_run
 from utils.logging_utils import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -31,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def run(args: argparse.Namespace) -> None:
+def run(args: argparse.Namespace) -> str:
 
     setup_logging()
 
@@ -63,6 +67,15 @@ def run(args: argparse.Namespace) -> None:
             label_encoder=label_encoder,
         )
 
+        # Save encoder and scaler to load with pyfunc model
+        temp_dir = tempfile.gettempdir()
+        scaler_path = Path(temp_dir) / "scaler.joblib"
+        encoder_path = Path(temp_dir) / "label_encoder.joblib"
+
+        joblib.dump(transformer, scaler_path)
+        joblib.dump(label_encoder, encoder_path)
+        logger.info(f"Persisted transformer and scaler to temp location: {temp_dir}")
+
         num_classes = train[TARGET_COL].nunique()
 
         study = run_tuning(
@@ -71,9 +84,27 @@ def run(args: argparse.Namespace) -> None:
             val_tf,
             val_target,
             num_classes=num_classes,
-            max_epochs=20,
         )
         logger.info(f"Best params: {study.best_params}")
+        logger.info(f"Best params F1-score: {study.best_value}")
+
+        logger.info("Starting final training run with best parameters")
+        best_params = study.best_params
+        final_run_id, best_val_f1 = final_training_run(
+            train_tf,
+            train_target,
+            val_tf,
+            val_target,
+            test_tf,
+            test_target,
+            num_classes=num_classes,
+            best_params=best_params,
+            scaler_path=scaler_path,
+            encoder_path=encoder_path,
+        )
+
+        logger.info(f"Final training complete. Best F1-score: {best_val_f1}")
+        return final_run_id
 
 
 def main() -> None:

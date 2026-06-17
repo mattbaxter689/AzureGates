@@ -5,8 +5,8 @@ from lightning.pytorch.callbacks import (
     Callback,
     ModelCheckpoint,
     EarlyStopping,
-    LearningRateMonitor,
 )
+from model.pyfunc_wrapper import SleepRiskPredictor
 
 logger = logging.getLogger(__name__)
 
@@ -43,24 +43,51 @@ def make_checkpoint(
     )
 
 
-def make_lr_monitor() -> LearningRateMonitor:
-    return LearningRateMonitor(logging_interval="epoch")
-
-
 class MlflowArtifactCallback(Callback):
     """
-    At the end of training the final model, automatically log the best checkpoint as the mlflow
-    artifact. Requires an active mlflow run
+    At the end of training the final model, automatically log the
+    best checkpoint as well a scaler and label encoder as a unified
+    pyfunc model
     """
 
-    def __init__(self, checkpoint_callback: ModelCheckpoint) -> None:
+    def __init__(
+        self,
+        checkpoint_callback: ModelCheckpoint,
+        scaler_path: str,
+        label_encoder_path: str,
+    ) -> None:
         super().__init__()
         self._ckpt_cb = checkpoint_callback
+        self._scaler_path = scaler_path
+        self._label_encoder_path = label_encoder_path
 
-    # TODO: create a special Pyfunc to load my scalers and model
     def on_train_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
-        best_path = self._ckpt_cb.best_model_path
-        if best_path and mlflow.active_run():
-            logger.info(f"Logged best checkpoint to mlflow: {best_path}")
-        elif not mlflow.active_run():
-            logger.warn("No active mlflow run - checkpoint not logged to mlflow")
+
+        best_ckpt_path = self._ckpt_cb.best_model_path
+
+        if not mlflow.active_run():
+            logger.warn("No active mlflow run - model not logged to mlflow")
+            return
+
+        if best_ckpt_path:
+            logger.info("Packaging model and scaler into custom PyFunc model")
+
+            # define the artifacts to map to mlflow
+            artifacts = {
+                "checkpoint": best_ckpt_path,
+                "scaler": self._scaler_path,
+                "label_encoder": self._label_encoder_path,
+            }
+
+            mlflow.pyfunc.log_model(
+                artifact_path="model",
+                python_model=SleepRiskPredictor(),
+                artifacts=artifacts,
+                code_paths=["model/classifier.py"],
+            )
+
+            logger.info("Successfully logged unified PyFunc asset to MlFlow")
+        else:
+            logger.error(
+                "ModelCheckpoint callback did not return a valid best path. PyFunc logging aborted"
+            )
