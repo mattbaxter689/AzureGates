@@ -32,6 +32,9 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Mounted input path for new data to check",
     )
+    p.add_argument(
+        "--final-run", type=str, required=True, help="The final run id for model"
+    )
     return p.parse_args()
 
 
@@ -104,7 +107,11 @@ def run(args: argparse.Namespace) -> str:
         )
 
         logger.info(f"Final training complete. Best F1-score: {best_val_f1}")
-        return final_run_id
+
+        output_path = Path(args.final_run)
+        output_path.mkdkir(parents=True, exist_ok=True)
+        (output_path / "run_id").write_text(str(final_run_id))
+        logger.info(f"Wrote run id: {final_run_id}")
 
 
 def main() -> None:
