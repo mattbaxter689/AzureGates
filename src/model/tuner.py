@@ -50,22 +50,26 @@ def make_objective(
         torch.cuda.empty_cache()
 
         with mlflow.start_run(
-            run_name=f"trial_{trial.number}", nested=True
+            run_name=f"trial_{trial.number}",
+            tags={"mlflow.parentRunId": PARENT_RUN_ID},
+            nested=True,
         ) as child_run:
-            child_run_id = child_run.info.run_id
 
-            # 3. Explicitly force the parent-child relationship for Azure ML's UI
-            if PARENT_RUN_ID:
-                mlflow.set_tag("mlflow.parentRunId", PARENT_RUN_ID)
+            params = {
+                "hidden_dim": trial.suggest_categorical("hidden_dim", [64, 128, 256]),
+                "batch_size": trial.suggest_categorical("batch_size", [128, 256, 512]),
+                "dropout": trial.suggest_float("dropout", 0.1, 0.5),
+                "lr": trial.suggest_float("lr", 1e-4, 1e-2, log=True),
+                "weight_decay": trial.suggest_float(
+                    "weight_decay", 1e-5, 1e-3, log=True
+                ),
+            }
 
-            # Sample the parameters
-            hidden_dim = trial.suggest_categorical("hidden_dim", [64, 128, 256])
-            batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
-            dropout = trial.suggest_float("dropout", 0.1, 0.5)
-            lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
-            weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
-
-            mlflow.log_params(trial.params)
+            hidden_dim = params["hidden_dim"]
+            batch_size = params["batch_size"]
+            dropout = params["dropout"]
+            lr = params["lr"]
+            weight_decay = params["weight_decay"]
 
             train_loader, val_loader, _ = make_dataloaders(
                 train_df,
@@ -93,8 +97,10 @@ def make_objective(
 
                 # 4. Bind the Lightning logger strictly to this child run ID
                 mlflow_logger = MLFlowLogger(
-                    tracking_uri=mlflow.get_tracking_uri(), run_id=child_run_id
+                    tracking_uri=TRACKING_URI, run_id=child_run.info.run_id
                 )
+
+                mlflow.log_params(params)
 
                 trainer = pl.Trainer(
                     max_epochs=max_epochs,
@@ -136,7 +142,7 @@ def run_tuning(
     val_target: pd.Series,
     num_classes: int,
     max_epochs: int = 50,
-    n_trials: int = 10,
+    n_trials: int = 20,
 ) -> optuna.Study:
     """
     Function to run the hyperparameter tuning on optuna
@@ -145,7 +151,7 @@ def run_tuning(
     study = optuna.create_study(
         direction="maximize",
         study_name="sleep-classification-tuner",
-        pruner=optuna.pruners.MedianPruner(n_startup_trials=1),
+        pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=3),
         sampler=optuna.samplers.TPESampler(seed=42),
     )
 
@@ -209,19 +215,27 @@ def final_training_run(
     )
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    with mlflow.start_run(run_name=f"final_training-{timestamp}") as run:
+    with mlflow.start_run(
+        run_name=f"final_training-{timestamp}",
+        nested=True,
+        tags={"mlflow.parentRunId": PARENT_RUN_ID},
+    ) as run:
+        mlflow_logger = MLFlowLogger(
+            tracking_uri=TRACKING_URI,
+            run_id=run.info.run_id,
+        )
         mlflow.log_params(best_params)
-        mlflow.set_tag("run_type", "final_production_candidate")
 
         trainer = pl.Trainer(
             max_epochs=max_epochs,
             accelerator="auto",
             devices=1,
             callbacks=[ckpt_cb, early_stopping, artifact_db],
-            logger=False,
+            logger=mlflow_logger,
             enable_progress_bar=True,
         )
         trainer.fit(model, train_loader, val_loader)
+        best_val_f1 = float(trainer.callback_metrics.get("val_f1", 0.0))
 
         test_results = trainer.test(model, test_loader, verbose=False)
         if test_results:
@@ -230,7 +244,6 @@ def final_training_run(
             mlflow.log_metrics(test_metrics)
             logger.info(f"Testing complete. Metrics: {test_metrics}")
 
-        best_val_f1 = float(trainer.callback_metrics.get("val_f1", 0.0))
         mlflow.log_metric("best_val_f1", best_val_f1)
 
         run_id = run.info.run_id

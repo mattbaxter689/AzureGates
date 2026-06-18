@@ -1,4 +1,5 @@
 import logging
+import os
 import mlflow
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import (
@@ -83,7 +84,7 @@ class MlflowArtifactCallback(Callback):
                 artifact_path="model",
                 python_model=SleepRiskPredictor(),
                 artifacts=artifacts,
-                code_paths=["model/classifier.py"],
+                code_path=[os.path.join(os.path.dirname(__file__), "classifier.py")],
             )
 
             logger.info("Successfully logged unified PyFunc asset to MlFlow")
