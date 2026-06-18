@@ -127,12 +127,14 @@ def model_training_component() -> Command:
         command=(
             "python -m gates.model_training_gate "
             "--drift-detected ${{inputs.drift_detected}} "
-            "--training-data ${{inputs.processed_data}}"
+            "--training-data ${{inputs.processed_data}} "
+            "--final-run ${{outputs.final_run_id}}"
         ),
         inputs={
             "processed_data": Input(type="uri_folder"),
             "drift_detected": Input(type="uri_folder"),
         },
+        outputs={"final_run_id": Output(type="uri_folder", mode="rw_mount")},
     )
 
 
