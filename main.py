@@ -138,6 +138,20 @@ def model_training_component() -> Command:
     )
 
 
+def model_promotion_component() -> Command:
+    return command(
+        **_base_job_kwargs(
+            "model-promotion-gate",
+            "Model promotion gate to assess challenger promotion",
+        ),
+        command=(
+            "python -m gates.model_promotion_gate "
+            "--final-run-id ${{inputs.final_run_id}}"
+        ),
+        inputs={"final_run_id": Input(type="uri_folder")},
+    )
+
+
 @dsl.pipeline(
     description="Gated classification pipeline",
     experiment_name=CONFIG["pipeline"]["experiment_name"],
@@ -156,6 +170,10 @@ def build_pipeline(raw_data: Input, gold_data: Input):
     model_step = model_training_component()(
         processed_data=data_step.outputs.processed_data,
         drift_detected=drift_step.outputs.drift_output,
+    )
+
+    promotion_step = model_promotion_component()(
+        final_run_id=model_step.outputs.final_run_id
     )
 
     return {"drift_output": drift_step.outputs.drift_output}
@@ -185,7 +203,7 @@ def main() -> None:
     try:
         returned_job = ml_client.jobs.create_or_update(pipeline_job)
         job_url = returned_job.studio_url
-        console.print(f"\n[bold cyan]▶ Pipeline submitted[/bold cyan]")
+        console.print("\n[bold cyan]▶ Pipeline submitted[/bold cyan]")
         console.print(f"  Job ID : {returned_job.name}")
         console.print(f"  Studio : [link={job_url}]{job_url}[/link]")
 
