@@ -46,20 +46,24 @@ cp config.json.example config.json
 
 ### 3. Create Azure ML Execution Environment
 
-We need an environment on Azure ML to execute our jobs. Our build environment is created based on a defined Docker image, as it allows us to install and us `uv` to build the environment image.
-
-```bash
-uv run infra/environment/create_environment.py 
-```
-
-This can take quite some time to run, so allow ample time to complete. To install the packages
-in a local `uv` project, run
+To configure the local development environ, in a new `uv` project, run
 
 ```bash
 uv sync
 ```
 
-To install the proper packages and versions
+This will install the required versions of all packages locally.
+
+We need an execution environment on Azure ML to execute our jobs. Azure ML has numerous pre-defined images with packages already installed, but
+in my case, I needed some extras added. Our build environment is created based on a defined Docker image, as it allows use to install and us `uv` to build the environment image,
+speeding up the install process
+
+```bash
+uv run infra/environment/create_environment.py 
+```
+
+This can take quite some time to run, so allow ample time to complete. Once this is done, add the environment name and version to your `config.json` file. Make sure the name matches exactly. The name
+and version can be found under the `Environment` tab in your Azure ML workspace.
 
 ### 4. Submit an Azure ML DSL Pipeline Job
 
@@ -67,7 +71,7 @@ To install the proper packages and versions
 uv run main.py
 ```
 
-This configures an Azure ML DSL pipeline build to execute the gates
+This configures an Azure ML DSL pipeline build to execute the gates. It makes use of the azure SDK v2 to configure this. Alternatively, you can create the yaml configuration for this and submit jobs using that instead
 
 ## Data Asset Governance
 
@@ -94,3 +98,12 @@ In the early stages of development, so far I have experience some issues that ca
 - **Issues Submitting Jobs**: This is something else that caused me a lot of pain. Like the data asset issue, you need the `AzureML Data Scientist` IAM role attached to your compute target as well. This is what is running the jobs and needs additional access to the workspace. This one took an embarrassing amount of time to figure out.
 - **Azure ML Job Submission Taking Too Long**: This can happen when you try to submit an Azure ML job and it tries to upload your entire codebase as part of the job execution. You can simply get around this by creating an `.amlignore` file and only uploading exactly what is needed. Once this was fixed, this has not been an issue since
 - **GPU Access in Azure ML**: I initially did another AzureML project several months back, and I was looking to get GPU access for that project as well. I only very recently identified (As embarrassing to say), that I need to request the GPU access from *inside* the AzureML *WORKSPACE*, rather than at the *SUBSCRIPTION* level. The pain of back and forth with support requests, and thinking that GPU's are impossible to get, was simply performed by requesting access inside my workspace. To do the same, first head to **Azure Machine Learning** > **Quota** > **<YOUR SUBSCRIPTION>** > **<YOUR REGION>**. From there, you can configure your workspace quota and request GPU access.
+- **Using Terraform to Create Resources**: At first, it is easier to use terraform to ignore compute, and instead spin up other resources, and see what compute is available to you. In my case, for both CPU and GPU clusters, I
+needed to request access first from Azure, receive approval, and then spin  up the compute targets using terraform. This way, you won't run into issues with access certain computes that are not yet available to you. 
+Once you have the quota available, adding your compute and required IAM roles to your compute can be taken care of by Terraform itself
+- **Azure ML Conflicting MlFlow versions**: This is perhaps one of the bigger pain points that I had experienced. When installing azureml-mlflow, it installs `mlflow-skinny` alongside it. The skinny package is missing some
+of the essential pieces, so we need to install the standard `mlflow` package alongside this. There is really no issue when logging experiments to your workspace MlFlow instance, but the greatest issue is when you try and log
+a model. If you install the latest MlFlow version, you might run into `api/v2/... not available` or something similar to that. This took some time to figure out, but Azure ML still uses older versions of MlFlow within it's 
+ecosystem. Since you are using a new version, trying to log a model will and use the *NEW* API, rather than the old one. Additionally, you need both `mlflow` and `mlflow-skinny` to be pinned to the same version, otherwise
+the issue will still persist. After much trial and error, I found that forcing both `mlflow` and `mlflow-skinny` to version 2.7.1 made logging models work. I'm not sure if this is a known problem with Azure ML, or perhaps
+I have done something incorrectly when configuring my workspace, but this took literal **DAYS** to figure out. Save yourself the time and energy, and make sure you pin both of these versions before logging any of the models
