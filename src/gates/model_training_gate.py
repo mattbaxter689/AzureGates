@@ -110,7 +110,7 @@ def run(args: argparse.Namespace) -> str:
 
         output_path = Path(args.final_run)
         output_path.mkdkir(parents=True, exist_ok=True)
-        (output_path / "run_id").write_text(str(final_run_id))
+        (output_path / "run_id.txt").write_text(str(final_run_id))
         logger.info(f"Wrote run id: {final_run_id}")
 
 
