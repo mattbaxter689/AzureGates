@@ -44,6 +44,23 @@ def load_drift_output(file_path: str) -> str:
     return drift_path.read_text().strip()
 
 
+def load_final_run_output(file_path: str) -> str:
+    """
+    Load run id from final model run
+    in model training step
+    """
+    data_path = Path(file_path)
+    run_path = data_path / "run_id.txt"
+
+    if not run_path.exists():
+        raise FileNotFoundError(
+            f"Run ID output file not found in input path: {run_path}"
+        )
+    logger.info("Final run id loaded successfully from mount")
+
+    return run_path.read_text().strip()
+
+
 def load_baseline_data(file_path: str) -> dict[str, float]:
     """
     Load baseline data uploaded from Data Versioning step
