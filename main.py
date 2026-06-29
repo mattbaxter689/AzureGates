@@ -1,16 +1,13 @@
-import argparse
 import json
 import logging
 import sys
-from enum import Enum
 from pathlib import Path
 
 from azure.ai.ml import MLClient, Input, command, Output, dsl
-from azure.ai.ml.entities import Command
+from azure.ai.ml.entities import Command, PipelineJobSettings
 from azure.identity import DefaultAzureCredential
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 log = logging.getLogger("orchestrator")
@@ -18,28 +15,6 @@ console = Console()
 
 ROOT = Path(__file__).parent
 CONFIG: dict = json.loads((ROOT / "config.json").read_text())
-
-
-# ------ Gating -------
-class Gate(Enum):
-    DATA = "data"
-    DRIFT = "drift"
-    FIT = "fit"
-    # PROMOTE = "promote"
-    # DEPLOY = "deploy"
-
-
-# More gates will go here, but will happen iteratively as things are built out
-GATE_ORDER = [Gate.DATA, Gate.DRIFT, Gate.FIT]
-
-
-# -------- Arg parsing -------
-def parse_args() -> argparse.Namespace:
-
-    # NOTE: again, we add logic for everything but comment and add iteratively
-    p = argparse.ArgumentParser(description="AML Classification Pipeline Orchestrator")
-    p.add_argument("--start-from", choices=[g.value for g in Gate], default="data")
-    return p.parse_args()
 
 
 # ----- AML client and environment -------
@@ -146,9 +121,13 @@ def model_promotion_component() -> Command:
         ),
         command=(
             "python -m gates.model_promotion_gate "
-            "--final-run-id ${{inputs.final_run_id}}"
+            "--final-run-id ${{inputs.final_run_id}} "
+            "--processed-data ${{inputs.processed_data}}"
         ),
-        inputs={"final_run_id": Input(type="uri_folder")},
+        inputs={
+            "final_run_id": Input(type="uri_folder"),
+            "processed_data": Input(type="uri_folder"),
+        },
     )
 
 
@@ -173,31 +152,22 @@ def build_pipeline(raw_data: Input, gold_data: Input):
     )
 
     promotion_step = model_promotion_component()(
-        final_run_id=model_step.outputs.final_run_id
+        final_run_id=model_step.outputs.final_run_id,
+        processed_data=data_step.outputs.processed_data,
     )
 
     return {"drift_output": drift_step.outputs.drift_output}
 
 
 def main() -> None:
-    args = parse_args()
     ml_client = get_client()
-
-    start_gate = Gate(args.start_from)
-    active_gates = GATE_ORDER[GATE_ORDER.index(start_gate) :]
-
-    table = Table(title="Pipeline Execution Plan", show_header=True)
-    table.add_column("Gate", style="cyan")
-    table.add_column("Status", style="white")
-    for gate in GATE_ORDER:
-        status = "ACTIVE" if gate in active_gates else "SKIPPED"
-        style = "green" if status == "ACTIVE" else "dim"
-        table.add_row(gate.value, f"[{style}]{status}[/{style}]")
-    console.print(table)
 
     pipeline_job = build_pipeline(
         raw_data=Input(type="uri_file", path=CONFIG["data"]["name"]),
         gold_data=Input(type="uri_file", path=CONFIG["data"]["name"]),
+    )
+    pipeline_job.settings = PipelineJobSettings(
+        force_rerun=True, default_compute=get_compute()
     )
 
     try:
