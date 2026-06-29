@@ -25,13 +25,6 @@ dependencies = [
     "scipy>=1.16.3",
 ]
 
-[tool.pyright]
-executionEnvironments = [{ root = "src" }]
-typeCheckingMode = "standard"
-venv = ".venv"
-venvPath = "."
-diagnosticMode = "openFilesOnly"
-
 [[tool.uv.index]]
 name = "pytorch-cu124"
 url = "https://download.pytorch.org/whl/cu124"
