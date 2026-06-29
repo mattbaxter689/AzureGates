@@ -8,7 +8,7 @@ from mlflow.client import MlflowClient
 
 from utils.logging_utils import setup_logging
 from data.preprocessing import TARGET_COL, load_data, load_final_run_output
-from utils.mlflow_utils import validate_and_promote_challenger
+from utils.mlflow_utils import validate_and_promote_challenger, archive_previous_models
 
 # from pathlib import Path
 
@@ -74,6 +74,9 @@ def run(args: argparse.Namespace) -> None:
         return None
 
     if is_first_deployment or (challenger_f1 > champion_f1):
+        logger.info("Archiving previous Champion models")
+        archive_previous_models(client, model_name, deployment_role="champion")
+
         logger.info("Promoting Challenger model to Champion")
 
         client.transition_model_version_stage(

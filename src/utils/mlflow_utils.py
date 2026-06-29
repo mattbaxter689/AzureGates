@@ -55,7 +55,7 @@ def validate_and_promote_challenger(
         )
 
     logger.info("Archiving previous challenger models")
-    archive_previous_challenger(client, model_name)
+    archive_previous_models(client, model_name, deployment_role="challenger")
 
     model_uri = f"runs:/{run_id}/model"
     logger.info("Registering version run from registry path")
@@ -77,26 +77,23 @@ def validate_and_promote_challenger(
     return challenger_version
 
 
-def archive_previous_challenger(client: MlflowClient, model_name: str) -> None:
+def archive_previous_models(
+    client: MlflowClient, model_name: str, deployment_role: str = "challenger"
+) -> None:
     """
     Archive any old versions of staging models, as they are
     no longer needed
     """
     existing_versions = client.search_model_versions(f"name='{model_name}'")
-
     for mv in existing_versions:
-        if mv.current_stage == "Staging":
-            logger.info(f"Archiving old challenger: Version {mv.version}")
-
-            # Transition it to Archived
+        if mv.tags.get("deployment_role") == deployment_role:
+            logger.info(f"Archiving old {deployment_role}: Version {mv.version}")
             client.transition_model_version_stage(
                 name=model_name, version=mv.version, stage="Archived"
             )
-
-            # Update its tag
             client.set_model_version_tag(
                 name=model_name,
                 version=mv.version,
                 key="deployment_role",
-                value="archived_challenger",
+                value=f"archived_{deployment_role}",
             )
