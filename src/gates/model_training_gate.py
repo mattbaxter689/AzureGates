@@ -109,7 +109,7 @@ def run(args: argparse.Namespace) -> str:
         logger.info(f"Final training complete. Best F1-score: {best_val_f1}")
 
         output_path = Path(args.final_run)
-        output_path.mkdkir(parents=True, exist_ok=True)
+        output_path.mkdir(parents=True, exist_ok=True)
         (output_path / "run_id.txt").write_text(str(final_run_id))
         logger.info(f"Wrote run id: {final_run_id}")
 
