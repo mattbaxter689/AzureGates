@@ -17,16 +17,18 @@ class SleepRiskPredictor(mlflow.pyfunc.PythonModel):
     def load_context(self, context):
         """Loads artifacts scaler and checkpoint into memory on startup"""
 
-        # load scalers and model
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.scaler: ColumnTransformer = joblib.load(context.artifacts["scaler"])
         self.label_encoder: LabelEncoder = joblib.load(
             context.artifacts["label_encoder"]
         )
-        self.model = SleepClassifier.load_from_checkpoint(
-            context.artifacts["checkpoint"]
-        )
 
-        # set model to eval mode
+        # Explicitly map the checkpoint location to the target hardware device
+        self.model = SleepClassifier.load_from_checkpoint(
+            context.artifacts["checkpoint"], map_location=self.device
+        )
+        self.model.to(self.device)
         self.model.eval()
 
     def predict(self, context, model_input: pd.DataFrame) -> list[str]:
@@ -39,7 +41,7 @@ class SleepRiskPredictor(mlflow.pyfunc.PythonModel):
         elif hasattr(X_scaled, "to_numpy"):
             X_scaled = X_scaled.to_numpy()
 
-        X_tensor = torch.tensor(X_scaled, dtype=torch.float32)
+        X_tensor = torch.tensor(X_scaled, dtype=torch.float32).to(self.device)
 
         with torch.no_grad():
             logits = self.model(X_tensor)
