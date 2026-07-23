@@ -122,12 +122,14 @@ def model_promotion_component() -> Command:
         command=(
             "python -m gates.model_promotion_gate "
             "--final-run-id ${{inputs.final_run_id}} "
-            "--processed-data ${{inputs.processed_data}}"
+            "--processed-data ${{inputs.processed_data}} "
+            "--decision-output ${{outputs.promotion_decision}}"
         ),
         inputs={
             "final_run_id": Input(type="uri_folder"),
             "processed_data": Input(type="uri_folder"),
         },
+        outputs={"promotion_decision": Output(type="uri_folder", mode="rw_mount")},
     )
 
 
