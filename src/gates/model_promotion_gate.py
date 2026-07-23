@@ -15,6 +15,8 @@ from utils.mlflow_utils import tag_challenger, resolve_version_by_role
 
 logger = logging.getLogger(__name__)
 
+LATENCY_THRESHOLD = 0.015
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Model Promotion Gate")
@@ -88,13 +90,13 @@ def run(args: argparse.Namespace) -> None:
         champion_f1 = f1_score(y_true, champion_preds, average="macro")
         logger.info(f"Champion v{champion_version}: f1={champion_f1:.4f}")
 
-    latency_ok = challenger_latency <= args.latency_threshold
+    latency_ok = challenger_latency <= LATENCY_THRESHOLD
     beats_champion = is_first_deployment or (challenger_f1 > champion_f1)
 
     if not latency_ok:
         decision, reason = "reject", (
             f"Latency {challenger_latency*1000:.2f}ms exceeds "
-            f"{args.latency_threshold*1000:.2f}ms budget"
+            f"{LATENCY_THRESHOLD*1000:.2f}ms budget"
         )
     elif is_first_deployment:
         decision, reason = "promote_first", "No champion currently deployed"
