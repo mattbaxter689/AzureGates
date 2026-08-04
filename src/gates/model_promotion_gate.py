@@ -111,6 +111,7 @@ def run(args: argparse.Namespace) -> None:
 
     logger.info(f"Gate decision: {decision} ({reason})")
 
+    # This should live inside a pydantic base model or dataclass
     output = {
         "decision": decision,
         "reason": reason,

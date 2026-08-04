@@ -133,6 +133,20 @@ def model_promotion_component() -> Command:
     )
 
 
+def model_deployment_component() -> Command:
+    return command(
+        **_base_job_kwargs(
+            "model-deployment-get",
+            "Deploys model to Azure ML endpoint",
+        ),
+        command=(
+            "python -m gates.model_deployment_gate "
+            "--decision-input ${{inputs.promotion_data}}"
+        ),
+        inputs={"promotion_data": Input(type="uri_folder")},
+    )
+
+
 @dsl.pipeline(
     description="Gated classification pipeline",
     experiment_name=CONFIG["pipeline"]["experiment_name"],
@@ -156,6 +170,10 @@ def build_pipeline(raw_data: Input, gold_data: Input):
     promotion_step = model_promotion_component()(
         final_run_id=model_step.outputs.final_run_id,
         processed_data=data_step.outputs.processed_data,
+    )
+
+    deployment_step = model_deployment_component()(
+        promotion_data=promotion_step.outputs.promotion_decision
     )
 
     return {"drift_output": drift_step.outputs.drift_output}
