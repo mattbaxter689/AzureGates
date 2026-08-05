@@ -87,7 +87,6 @@ def run(args: argparse.Namespace) -> str:
             val_tf,
             val_target,
             num_classes=num_classes,
-            n_trials=5,
         )
         logger.info(f"Best params: {study.best_params}")
         logger.info(f"Best params F1-score: {study.best_value}")
