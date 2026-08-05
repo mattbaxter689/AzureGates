@@ -7,7 +7,13 @@ from pathlib import Path
 from mlflow.client import MlflowClient
 from utils.logging_utils import setup_logging
 from utils.asset_utils import get_ml_client
-from deploy.deploy import Decision, handle_promote_first, handle_reject, handle_shadow
+from deploy.deploy import (
+    Decision,
+    ensure_champion_live,
+    handle_promote_first,
+    handle_reject,
+    handle_shadow,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +42,14 @@ def run(args: argparse.Namespace) -> None:
 
     mlflow_client = MlflowClient()
     ml_client = get_ml_client()
+
+    ensure_champion_live(
+        ml_client,
+        mlflow_client,
+        decision["model_name"],
+        "sleep_endpoint",
+        args.instance_type,
+    )
 
     dispatch: dict[str, Callable[[], None]] = {
         "promote_first": lambda: handle_promote_first(

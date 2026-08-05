@@ -7,6 +7,8 @@ from azure.ai.ml.entities import ManagedOnlineDeployment, ManagedOnlineEndpoint
 from azure.core.exceptions import ResourceNotFoundError
 from mlflow.tracking import MlflowClient
 
+from utils.mlflow_utils import resolve_version_by_role
+
 
 logger = logging.getLogger(__name__)
 
@@ -174,3 +176,57 @@ def handle_reject(
     logger.info(f"Challenger v{version} rejected: {decision['reason']}")
     retag(mlflow_client, model_name, version, "archived_challenger", "Archived")
     ml_client.models.archive(name=model_name, version=version)
+
+
+def ensure_champion_live(
+    ml_client: MLClient,
+    mlflow_client: MlflowClient,
+    model_name: str,
+    endpoint_name: str,
+    instance_type: str,
+) -> None:
+    """
+    Safety net: if a champion is tagged in the registry but isn't currently
+    serving on the endpoint (endpoint deleted, deployment lost, or this is
+    the first deploy run since champion tags were set some other way),
+    stand it back up. Runs regardless of the challenger's decision, so a
+    rejected or shadowed challenger never leaves the endpoint without
+    champion coverage.
+    """
+    champion_mv = resolve_version_by_role(mlflow_client, model_name, "champion")
+    if champion_mv is None:
+        return
+
+    try:
+        ml_client.online_endpoints.get(endpoint_name)
+        try:
+            ml_client.online_deployments.get(
+                name=CHAMPION_DEPLOYMENT, endpoint_name=endpoint_name
+            )
+            champion_live = True
+        except ResourceNotFoundError:
+            champion_live = False
+    except ResourceNotFoundError:
+        champion_live = False
+
+    if champion_live:
+        return
+
+    logger.warning(
+        f"Champion v{champion_mv.version} is tagged in the registry but not live "
+        f"on endpoint '{endpoint_name}'. Deploying it now."
+    )
+    ensure_endpoint(ml_client, endpoint_name)
+    ensure_deployment(
+        ml_client,
+        endpoint_name,
+        CHAMPION_DEPLOYMENT,
+        model_name,
+        champion_mv.version,
+        instance_type,
+    )
+
+    endpoint = ml_client.online_endpoints.get(endpoint_name)
+    if endpoint.traffic.get(CHAMPION_DEPLOYMENT, 0) == 0:
+        endpoint.traffic = {**(endpoint.traffic or {}), CHAMPION_DEPLOYMENT: 100}
+        ml_client.online_endpoints.begin_create_or_update(endpoint).result()
