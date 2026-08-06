@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
 
 def run(args: argparse.Namespace) -> None:
     setup_logging()
-    with open(Path(args.decision_input / "decision.json")) as f:
+    with open(Path(args.decision_input) / "decision.json") as f:
         decision: Decision = json.load(f)
 
     mlflow_client = MlflowClient()
