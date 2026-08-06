@@ -10,6 +10,7 @@ from mlflow.client import MlflowClient
 
 from utils.logging_utils import setup_logging
 from data.preprocessing import TARGET_COL, load_data, load_final_run_output
+from deploy.deploy import Decision
 from utils.mlflow_utils import tag_challenger, resolve_version_by_role
 
 
@@ -112,7 +113,7 @@ def run(args: argparse.Namespace) -> None:
     logger.info(f"Gate decision: {decision} ({reason})")
 
     # This should live inside a pydantic base model or dataclass
-    output = {
+    output: Decision = {
         "decision": decision,
         "reason": reason,
         "model_name": "sleep_disorder_classifier",
