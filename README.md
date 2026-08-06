@@ -49,7 +49,7 @@ cp config.json.example config.json
 To configure the local development environ, in a new `uv` project, run
 
 ```bash
-uv sync
+uv sync --frozen
 ```
 
 This will install the required versions of all packages locally.
@@ -89,6 +89,26 @@ is quite powerful and allows us to pass and share information between pipeline j
 
 For this project, we mainly use `URI Files` and `URI Folders` for data assets, but other asset types exist
 like model assets, compute assets, etc. The list of assets and their types can be found [in the official documentation](https://learn.microsoft.com/en-us/azure/machine-learning/concept-azure-machine-learning-v2?view=azureml-api-2&tabs=sdk#data)
+
+## Future Improvements
+This project is not going to be perfect. These are some things off the top of my head that I would like to add once I have completed the original vision 
+and would like to come back to the project.
+
+- [ ] Add a config file for static parameter information
+- [ ] clean up mlflow use in data and drift gates
+- [ ] **ADD TESTS** for clean code practices
+- [ ] Additional gate checks for features like feature names, etc
+
+## Personal Note
+This project has been what feels like a long time coming, but really it's just been a few months of me working on it when I had the time to. In this time, I've had
+some ideas for new projects come up that I would eventually like to explore. Once I have completed the original vision for this project, I plan to pause development
+for a little while to explore a new project that interests me. After some time, I plan to come back and gradually improve what exists based on the future improvements.
+Ideally, I'd like to have my main projects that I come back to and just toy around with, while working on smaller scale POC's, and I think this fits the bill for 
+one of those big projects.
+
+I'm quite proud of what I've learned through Azure over this time, and all of the pain and suffering dealing with GPU access issues, IAM permission role issues, I've 
+learned a hell of a lot about the Azure ecosystem, and improved my understanding of it as well. That is *exactly* what I was hoping to get out of this, and by the end, 
+I will have a fully functioning AzureML DSL pipeline. While not production grade, it's still better than nothing.
 
 ## Troubleshooting / Common Issues
 
