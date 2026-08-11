@@ -184,14 +184,13 @@ resource "azurerm_role_assignment" "gpu_compute_storage_access" {
   depends_on = [azurerm_machine_learning_compute_cluster.gpu]
 }
 
-resource "azurerm_role_assignment" "gpu_endpoint_operator_access" {
+resource "azurerm_role_assignment" "gpu_aml_data_scientist" {
   principal_id         = azurerm_machine_learning_compute_cluster.gpu.identity[0].principal_id
-  role_definition_name = "AzureML Compute Operator"
+  role_definition_name = "AzureML Data Scientist"
   scope                = azurerm_machine_learning_workspace.aml.id
 
   depends_on = [azurerm_machine_learning_compute_cluster.gpu]
 }
-
 # Workspace — AzureML Data Scientist
 resource "azurerm_role_assignment" "workspace_aml_data_scientist" {
   principal_id         = azurerm_machine_learning_workspace.aml.identity[0].principal_id
