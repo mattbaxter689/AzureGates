@@ -31,6 +31,9 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--mirror-pct", type=int, default=10)
     p.add_argument("--instance-type", type=str, default="Standard_DS3_v2")
+    p.add_argument(
+        "--environment_name", type=str, default="gating-docker-context@latest"
+    )
 
     return p.parse_args()
 
@@ -47,8 +50,9 @@ def run(args: argparse.Namespace) -> None:
         ml_client,
         mlflow_client,
         decision["model_name"],
-        "sleep_endpoint",
+        "sleep-endpoint",
         args.instance_type,
+        args.environment_name,
     )
 
     dispatch: dict[str, Callable[[], None]] = {

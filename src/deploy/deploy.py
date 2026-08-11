@@ -58,6 +58,7 @@ def ensure_deployment(
     model_name: str,
     version: str,
     instance_type: str,
+    environment_name: str,
 ) -> None:
     deployment = ManagedOnlineDeployment(
         name=deployment_name,
@@ -65,6 +66,7 @@ def ensure_deployment(
         model=f"azureml:{model_name}:{version}",
         instance_type=instance_type,
         instance_count=1,
+        environment=environment_name,
     )
     ml_client.online_deployments.begin_create_or_update(deployment).result()
 
@@ -184,6 +186,7 @@ def ensure_champion_live(
     model_name: str,
     endpoint_name: str,
     instance_type: str,
+    environment_name: str,
 ) -> None:
     """
     Safety net: if a champion is tagged in the registry but isn't currently
@@ -224,6 +227,7 @@ def ensure_champion_live(
         model_name,
         champion_mv.version,
         instance_type,
+        environment_name,
     )
 
     endpoint = ml_client.online_endpoints.get(endpoint_name)
