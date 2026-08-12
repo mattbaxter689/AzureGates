@@ -23,6 +23,7 @@ dependencies = [
     "rich>=15.0.0",
     "scikit-learn>=1.8.0",
     "scipy>=1.16.3",
+    "pydantic>=2.13.4",
 ]
 
 [[tool.uv.index]]
