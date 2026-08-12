@@ -1,8 +1,10 @@
-import json
 import logging
-import sys
 from pathlib import Path
+import sys
 
+from config.config_models import OrchestratorConfig
+
+from src.config.loader import load_config
 from azure.ai.ml import MLClient, Input, command, Output, dsl
 from azure.ai.ml.entities import Command, PipelineJobSettings
 from azure.identity import DefaultAzureCredential
@@ -14,26 +16,17 @@ log = logging.getLogger("orchestrator")
 console = Console()
 
 ROOT = Path(__file__).parent
-CONFIG: dict = json.loads((ROOT / "config.json").read_text())
+CONFIG: OrchestratorConfig = load_config("settings/orchestrator_config.yaml")
 
 
 # ----- AML client and environment -------
 def get_client() -> MLClient:
     return MLClient(
         credential=DefaultAzureCredential(),
-        subscription_id=CONFIG["workspace"]["subscription_id"],
-        resource_group_name=CONFIG["workspace"]["resource_group"],
-        workspace_name=CONFIG["workspace"]["workspace_name"],
+        subscription_id=CONFIG.workspace.subscription_id,
+        resource_group_name=CONFIG.workspace.resource_group,
+        workspace_name=CONFIG.workspace.workspace_name,
     )
-
-
-def get_aml_environment() -> str:
-    cfg_env = CONFIG["environment"]
-    return f"{cfg_env['name']}@latest"
-
-
-def get_compute() -> str:
-    return CONFIG["compute"]["training_cluster_gpu"]
 
 
 # ------ Base Job Config ----------
@@ -42,9 +35,9 @@ def _base_job_kwargs(name: str, description: str) -> dict:
     return dict(
         display_name=name,
         description=description,
-        environment=get_aml_environment(),
-        compute=get_compute(),
-        experiment_name=CONFIG["pipeline"]["experiment_name"],
+        environment=CONFIG.environment.full_name,
+        compute=CONFIG.compute.compute_cluster,
+        experiment_name=CONFIG.pipeline.experiment_name,
         code="./src",
         environment_variables={"PYTHONPATH": "./"},
     )
@@ -63,13 +56,13 @@ def data_versioning_component() -> Command:
             "--output-training-path ${{outputs.processed_data}}"
         ),
         inputs={
-            "raw_data": Input(type="uri_file", path=CONFIG["data"]["name"]),
+            "raw_data": Input(type="uri_file", path=CONFIG.data.name),
         },
         outputs={
             "processed_data": Output(
                 type="uri_folder",
                 mode="rw_mount",
-                name=CONFIG["data"]["output_asset_name"],
+                name=CONFIG.data.output_asset_name,
             )
         },
     )
@@ -87,7 +80,7 @@ def drift_detection_component() -> Command:
             "--drift-output-path ${{outputs.drift_output}}"
         ),
         inputs={
-            "gold_data": Input(type="uri_file", path=CONFIG["data"]["name"]),
+            "gold_data": Input(type="uri_file", path=CONFIG.data.name),
             "processed_data": Input(
                 type="uri_folder",
             ),
@@ -149,8 +142,8 @@ def model_deployment_component() -> Command:
 
 @dsl.pipeline(
     description="Gated classification pipeline",
-    experiment_name=CONFIG["pipeline"]["experiment_name"],
-    default_compute=get_compute(),
+    experiment_name=CONFIG.pipeline.experiment_name,
+    default_compute=CONFIG.compute.compute_cluster,
 )
 def build_pipeline(raw_data: Input, gold_data: Input):
     data_step = data_versioning_component()(
@@ -183,11 +176,11 @@ def main() -> None:
     ml_client = get_client()
 
     pipeline_job = build_pipeline(
-        raw_data=Input(type="uri_file", path=CONFIG["data"]["name"]),
-        gold_data=Input(type="uri_file", path=CONFIG["data"]["name"]),
+        raw_data=Input(type="uri_file", path=CONFIG.data.name),
+        gold_data=Input(type="uri_file", path=CONFIG.data.name),
     )
     pipeline_job.settings = PipelineJobSettings(
-        force_rerun=True, default_compute=get_compute()
+        force_rerun=True, default_compute=CONFIG.compute.compute_cluster
     )
 
     try:
