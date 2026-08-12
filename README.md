@@ -24,7 +24,7 @@ A production-like, gate based MLOps pipeline built on Azure ML SDK v2.
 
 ### 1. Provision Azure ML Resources
 
-Provision the needed Azure ML resources via terraform and get your `config.json` from your workspace_name
+Provision the needed Azure ML resources via terraform
 
 ```bash
 terraform plan
@@ -35,13 +35,13 @@ Ensure to create a `terraform.tfvars` file to list the secrets for the project
 
 ### 2. Configure Workspace
 
-Create a `config.json` file for your project. This is used only for Azure ML DSL pipeline submission.
+Create / Rename fields in the `settings/orchestrator_config.yaml` file for your project. This is used only for Azure ML DSL pipeline submission.
 Any of this information is injected directly into the Azure ML job runtime and can be fetched via
 environment variables
 
 ```bash
-cp config.json.example config.json
-# Fill in your subscription_id, resource_group, workspace_name, and other azure details
+mv .env.example .env
+# Fill in your subscription id, resource group, and workspace name
 ```
 
 ### 3. Create Azure ML Execution Environment
@@ -62,13 +62,24 @@ speeding up the install process
 uv run infra/environment/create_environment.py 
 ```
 
-This can take quite some time to run, so allow ample time to complete. Once this is done, add the environment name and version to your `config.json` file. Make sure the name matches exactly. The name
+This can take quite some time to run, so allow ample time to complete. Once this is done, add the environment name and version to your `settings/orchestrator_config.yaml` file. Make sure the name matches exactly. The name
 and version can be found under the `Environment` tab in your Azure ML workspace.
 
 ### 4. Submit an Azure ML DSL Pipeline Job
+I've included a just file to make running the commands easier than having to set and source the environment 
+variables every time.
 
 ```bash
-uv run main.py
+just run
+```
+
+Alternatively, if you want to set the environment variables yourself before the run, you can do the following
+
+```bash
+set -a
+source .env
+set +a
+uv run orchestrator.py
 ```
 
 This configures an Azure ML DSL pipeline build to execute the gates. It makes use of the azure SDK v2 to configure this. Alternatively, you can create the yaml configuration for this and submit jobs using that instead
@@ -79,12 +90,12 @@ For this project, we make use of a static csv file as our "raw" data. In reality
 This raw data is stored in a `URI File` data asset. This is something that lives in your blob storage
 associated with your Azure ML project workspace. With Azure and it's DSL pipelines, we can pass these
 data assets to jobs as an `Input`. In this case, Azure automatically injects the asset into the job
-runtime, and we can fetch the path to access these jobs (see `main.py` for how to pass `Input`'s,
+runtime, and we can fetch the path to access these jobs (see `orchestrator.py` for how to pass `Input`'s,
 and any of the gates for how to access the data).
 
 For best practices and ensuring clear data versions between runs, we can register a data asset containing
 our data after performing a train-test split. In a DSL pipeline, we define an `Output` that allows us
-to create and register data assets from job runs simply by specifying the `name` field (again, see `main.py` for an example of how to use `Output`'s, and any gate script on how to send an `Output`). With DSL pipelines, we are able to directly any `Output` from a previous gate as an `Input` to another gate. This
+to create and register data assets from job runs simply by specifying the `name` field (again, see `orchestrator.py` for an example of how to use `Output`'s, and any gate script on how to send an `Output`). With DSL pipelines, we are able to directly any `Output` from a previous gate as an `Input` to another gate. This
 is quite powerful and allows us to pass and share information between pipeline jobs easily and cleanly.
 
 For this project, we mainly use `URI Files` and `URI Folders` for data assets, but other asset types exist
@@ -94,10 +105,11 @@ like model assets, compute assets, etc. The list of assets and their types can b
 This project is not going to be perfect. These are some things off the top of my head that I would like to add once I have completed the original vision 
 and would like to come back to the project.
 
+- [ ] Add CI/CD pipeline for retraining
 - [ ] Add a config file for static parameter information
 - [ ] clean up mlflow use in data and drift gates
 - [ ] **ADD TESTS** for clean code practices
-- [ ] Additional gate checks for features like feature names, etc
+- [ ] Additional gate checks for features like feature names, etc, to preserve data quality
 
 ## Personal Note
 This project has been what feels like a long time coming, but really it's just been a few months of me working on it when I had the time to. In this time, I've had
@@ -108,7 +120,8 @@ one of those big projects.
 
 I'm quite proud of what I've learned through Azure over this time, and all of the pain and suffering dealing with GPU access issues, IAM permission role issues, I've 
 learned a hell of a lot about the Azure ecosystem, and improved my understanding of it as well. That is *exactly* what I was hoping to get out of this, and by the end, 
-I will have a fully functioning AzureML DSL pipeline. While not production grade, it's still better than nothing.
+I will have a fully functioning AzureML DSL pipeline. While not production 
+grade in my eyes (as all things can be improve), it's better than other pipelines I've made.
 
 ## Troubleshooting / Common Issues
 
