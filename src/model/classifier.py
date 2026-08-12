@@ -1,9 +1,10 @@
-from typing import Any
 import logging
+from typing import Any
+
 import lightning.pytorch as pl
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.optim.adam import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchmetrics.classification import MulticlassAccuracy, MulticlassF1Score
@@ -59,7 +60,7 @@ class SleepClassifier(pl.LightningModule):
         else:
             self.class_weights = None
 
-        metric_kwargs = dict(num_classes=num_classes, average="macro")
+        metric_kwargs = {"num_classes": num_classes, "average": "macro"}
         self.train_acc = MulticlassAccuracy(**metric_kwargs)
         self.val_acc = MulticlassAccuracy(**metric_kwargs)
         self.val_f1 = MulticlassF1Score(**metric_kwargs)

@@ -1,6 +1,6 @@
-import torch
-import pandas as pd
 import numpy as np
+import pandas as pd
+import torch
 from torch.utils.data import DataLoader, Dataset
 
 
@@ -41,11 +41,11 @@ def make_dataloaders(
     """
     Helper function to create data loaders for all datasets
     """
-    kwargs = dict(
-        batch_size=batch_size,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-    )
+    kwargs = {
+        "batch_size": batch_size,
+        "num_workers": num_workers,
+        "pin_memory": torch.cuda.is_available(),
+    }
     train_loader = DataLoader(
         SleepDataset(train_df, train_target), shuffle=True, **kwargs
     )

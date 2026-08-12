@@ -1,7 +1,8 @@
-from azure.ai.ml import MLClient
-from azure.ai.ml.entities import Environment, BuildContext
-from azure.identity import DefaultAzureCredential
 import json
+
+from azure.ai.ml import MLClient
+from azure.ai.ml.entities import BuildContext, Environment
+from azure.identity import DefaultAzureCredential
 
 with open("config.json") as f:
     cfg = json.load(f)

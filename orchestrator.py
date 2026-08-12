@@ -1,15 +1,15 @@
 import logging
-from pathlib import Path
 import sys
+from pathlib import Path
 
-from config.config_models import OrchestratorConfig
-
-from src.config.loader import load_config
-from azure.ai.ml import MLClient, Input, command, Output, dsl
+from azure.ai.ml import Input, MLClient, Output, command, dsl
 from azure.ai.ml.entities import Command, PipelineJobSettings
 from azure.identity import DefaultAzureCredential
 from rich.console import Console
 from rich.panel import Panel
+
+from src.config.config_models import OrchestratorConfig
+from src.config.loader import load_config
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 log = logging.getLogger("orchestrator")
@@ -32,15 +32,15 @@ def get_client() -> MLClient:
 # ------ Base Job Config ----------
 def _base_job_kwargs(name: str, description: str) -> dict:
 
-    return dict(
-        display_name=name,
-        description=description,
-        environment=CONFIG.environment.full_name,
-        compute=CONFIG.compute.compute_cluster,
-        experiment_name=CONFIG.pipeline.experiment_name,
-        code="./src",
-        environment_variables={"PYTHONPATH": "./"},
-    )
+    return {
+        "display_name": name,
+        "description": description,
+        "environment": CONFIG.environment.full_name,
+        "compute": CONFIG.compute.compute_cluster,
+        "experiment_name": CONFIG.pipeline.experiment_name,
+        "code": "./src",
+        "environment_variables": {"PYTHONPATH": "./"},
+    }
 
 
 # ------ Job Builders ---------
@@ -165,7 +165,7 @@ def build_pipeline(raw_data: Input, gold_data: Input):
         processed_data=data_step.outputs.processed_data,
     )
 
-    deployment_step = model_deployment_component()(
+    _deployment_step = model_deployment_component()(
         promotion_data=promotion_step.outputs.promotion_decision
     )
 

@@ -1,12 +1,14 @@
 import logging
 import os
-import mlflow
+
 import lightning.pytorch as pl
+import mlflow
 from lightning.pytorch.callbacks import (
     Callback,
-    ModelCheckpoint,
     EarlyStopping,
+    ModelCheckpoint,
 )
+
 from model.pyfunc_wrapper import SleepRiskPredictor
 
 logger = logging.getLogger(__name__)
@@ -67,7 +69,7 @@ class MlflowArtifactCallback(Callback):
         best_ckpt_path = self._ckpt_cb.best_model_path
 
         if not mlflow.active_run():
-            logger.warn("No active mlflow run - model not logged to mlflow")
+            logger.warning("No active mlflow run - model not logged to mlflow")
             return
 
         if best_ckpt_path:

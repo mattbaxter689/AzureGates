@@ -6,13 +6,13 @@ from pathlib import Path
 import joblib
 
 from data.preprocessing import (
-    load_drift_output,
+    TARGET_COL,
     encode_features,
     infer_schema,
     load_data,
-    TARGET_COL,
+    load_drift_output,
 )
-from model.tuner import run_tuning, final_training_run
+from model.tuner import final_training_run, run_tuning
 from utils.logging_utils import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,6 @@ def run(args: argparse.Namespace) -> str:
     logger.info(f"Drift output from drift gate: {result}")
 
     if result == "drifted":
-
         train, val, test = load_data(args.training_data)
         num_cols, cat_cols = infer_schema(train)
 

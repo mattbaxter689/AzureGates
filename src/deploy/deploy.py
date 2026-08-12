@@ -9,7 +9,6 @@ from mlflow.tracking import MlflowClient
 
 from utils.mlflow_utils import resolve_version_by_role
 
-
 logger = logging.getLogger(__name__)
 
 CHAMPION_DEPLOYMENT = "champion"
@@ -92,9 +91,9 @@ def handle_promote_first(
 ) -> None:
     model_name = decision["model_name"]
     version = decision["challenger_version"]
-    assert (
-        version is not None
-    ), "promote_first decision must include a challenger_version"
+    assert version is not None, (
+        "promote_first decision must include a challenger_version"
+    )
 
     logger.info(
         f"No champion exists — promoting challenger v{version} directly to champion."
@@ -126,9 +125,9 @@ def handle_shadow(
     model_name = decision["model_name"]
     challenger_version = decision["challenger_version"]
     champion_version = decision["champion_version"]
-    assert (
-        challenger_version is not None and champion_version is not None
-    ), "shadow decision must include both challenger_version and champion_version"
+    assert challenger_version is not None and champion_version is not None, (
+        "shadow decision must include both challenger_version and champion_version"
+    )
 
     logger.info(
         f"Challenger v{challenger_version} beat champion v{champion_version} — "

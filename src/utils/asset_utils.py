@@ -1,7 +1,8 @@
 import logging
+import os
+
 from azure.ai.ml import MLClient
 from azure.identity import DefaultAzureCredential
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,6 @@ def get_ml_client() -> MLClient:
         )
     except Exception as e:
         logger.error(
-            "Error connecting to MlClient. Perhaps configure environment variables"
+            f"Error connecting to MlClient. Perhaps configure environment variables: {e}"
         )
-        raise e
+        raise

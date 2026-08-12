@@ -1,10 +1,11 @@
-import logging
 import json
+import logging
+import os
 from pathlib import Path
+
+import mlflow
 from mlflow.client import MlflowClient
 from mlflow.entities.model_registry import ModelVersion
-import os
-import mlflow
 
 logger = logging.getLogger(__name__)
 

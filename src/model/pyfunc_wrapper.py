@@ -1,7 +1,7 @@
-import mlflow.pyfunc
 import joblib
-import torch
+import mlflow.pyfunc
 import pandas as pd
+import torch
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import LabelEncoder
 

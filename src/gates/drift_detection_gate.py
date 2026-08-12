@@ -1,11 +1,13 @@
 import argparse
 import logging
 from pathlib import Path
+
 import mlflow
 import numpy as np
 from scipy import stats
-from utils.logging_utils import setup_logging, configure_mlflow
-from data.preprocessing import load_data, infer_schema, load_baseline_data
+
+from data.preprocessing import infer_schema, load_baseline_data, load_data
+from utils.logging_utils import configure_mlflow, setup_logging
 
 logger = logging.getLogger(__name__)
 

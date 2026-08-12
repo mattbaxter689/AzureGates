@@ -1,8 +1,10 @@
 import logging
-import sys
 import os
-from utils.asset_utils import get_ml_client
+import sys
+
 import mlflow
+
+from utils.asset_utils import get_ml_client
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,7 @@ def setup_logging(level: int = logging.INFO) -> None:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
-def configure_mlflow(experiment_name: str = "AMLGating") -> str:
+def configure_mlflow() -> str:
     """
     Set up MLflow to log to the AML workspace.
 
@@ -41,3 +43,4 @@ def configure_mlflow(experiment_name: str = "AMLGating") -> str:
         logger.info("Tracking URI for MLFlow set")
     except Exception as e:
         logger.warning(f"Could not resolve tracking URI: {e}")
+        raise

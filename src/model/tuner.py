@@ -1,24 +1,25 @@
-import os
-import mlflow
+import gc
 import logging
-import pandas as pd
+import os
+from collections.abc import Callable
+from datetime import UTC, datetime
+
 import lightning.pytorch as pl
-from optuna.integration import PyTorchLightningPruningCallback
+import mlflow
+import optuna
+import pandas as pd
+import torch
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.loggers.mlflow import MLFlowLogger
-import optuna
-from typing import Callable
-from datetime import datetime
-import gc
-import torch
+from optuna.integration import PyTorchLightningPruningCallback
 
-from model.classifier import SleepClassifier
 from data.dataset import make_dataloaders
 from model.callbacks import (
+    MlflowArtifactCallback,
     make_checkpoint,
     make_early_stopping,
-    MlflowArtifactCallback,
 )
+from model.classifier import SleepClassifier
 
 os.environ["MLFLOW_DISABLE_LOGGED_MODELS"] = "true"
 
@@ -54,7 +55,6 @@ def make_objective(
             tags={"mlflow.parentRunId": PARENT_RUN_ID},
             nested=True,
         ) as child_run:
-
             params = {
                 "hidden_dim": trial.suggest_categorical("hidden_dim", [64, 128, 256]),
                 "batch_size": trial.suggest_categorical("batch_size", [128, 256, 512]),
@@ -214,7 +214,7 @@ def final_training_run(
         ckpt_cb, scaler_path=str(scaler_path), label_encoder_path=str(encoder_path)
     )
 
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     with mlflow.start_run(
         run_name=f"final_training-{timestamp}",
         nested=True,

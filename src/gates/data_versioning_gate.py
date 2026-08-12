@@ -1,17 +1,18 @@
 import argparse
+import json
 import logging
 from pathlib import Path
-import mlflow
-import json
 
-from utils.logging_utils import setup_logging, configure_mlflow
+import mlflow
+
 from data.preprocessing import (
     clean,
     compute_baseline_stats,
-    split,
     infer_schema,
     load_data,
+    split,
 )
+from utils.logging_utils import configure_mlflow, setup_logging
 
 logger = logging.getLogger(__name__)
 

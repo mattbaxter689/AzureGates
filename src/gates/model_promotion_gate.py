@@ -1,18 +1,18 @@
 import argparse
+import json
 import logging
+import time
+from pathlib import Path
+
 import mlflow
 import mlflow.pyfunc
-import time
-import json
-from pathlib import Path
-from sklearn.metrics import f1_score
 from mlflow.client import MlflowClient
+from sklearn.metrics import f1_score
 
-from utils.logging_utils import setup_logging
 from data.preprocessing import TARGET_COL, load_data, load_final_run_output
 from deploy.deploy import Decision
-from utils.mlflow_utils import tag_challenger, resolve_version_by_role
-
+from utils.logging_utils import setup_logging
+from utils.mlflow_utils import resolve_version_by_role, tag_challenger
 
 logger = logging.getLogger(__name__)
 
@@ -95,19 +95,26 @@ def run(args: argparse.Namespace) -> None:
     beats_champion = is_first_deployment or (challenger_f1 > champion_f1)
 
     if not latency_ok:
-        decision, reason = "reject", (
-            f"Latency {challenger_latency*1000:.2f}ms exceeds "
-            f"{LATENCY_THRESHOLD*1000:.2f}ms budget"
+        decision, reason = (
+            "reject",
+            (
+                f"Latency {challenger_latency * 1000:.2f}ms exceeds "
+                f"{LATENCY_THRESHOLD * 1000:.2f}ms budget"
+            ),
         )
     elif is_first_deployment:
         decision, reason = "promote_first", "No champion currently deployed"
     elif beats_champion:
-        decision, reason = "shadow", (
-            f"Challenger f1 {challenger_f1:.4f} beats champion f1 {champion_f1:.4f}"
+        decision, reason = (
+            "shadow",
+            (f"Challenger f1 {challenger_f1:.4f} beats champion f1 {champion_f1:.4f}"),
         )
     else:
-        decision, reason = "reject", (
-            f"Challenger f1 {challenger_f1:.4f} did not beat champion f1 {champion_f1:.4f}"
+        decision, reason = (
+            "reject",
+            (
+                f"Challenger f1 {challenger_f1:.4f} did not beat champion f1 {champion_f1:.4f}"
+            ),
         )
 
     logger.info(f"Gate decision: {decision} ({reason})")

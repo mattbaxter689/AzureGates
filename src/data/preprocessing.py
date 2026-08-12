@@ -1,15 +1,15 @@
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn import set_config
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler, OneHotEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-import logging
 import json
+import logging
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+from sklearn import set_config
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, OneHotEncoder
 
 set_config(transform_output="pandas")
 

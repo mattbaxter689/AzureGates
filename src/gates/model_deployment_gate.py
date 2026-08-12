@@ -1,12 +1,11 @@
 import argparse
-from collections.abc import Callable
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from mlflow.client import MlflowClient
-from utils.logging_utils import setup_logging
-from utils.asset_utils import get_ml_client
+
 from deploy.deploy import (
     Decision,
     ensure_champion_live,
@@ -14,7 +13,8 @@ from deploy.deploy import (
     handle_reject,
     handle_shadow,
 )
-
+from utils.asset_utils import get_ml_client
+from utils.logging_utils import setup_logging
 
 logger = logging.getLogger(__name__)
 
