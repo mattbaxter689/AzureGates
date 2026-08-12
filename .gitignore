@@ -14,3 +14,4 @@ config.json
 *.tfstate
 *.terraform/
 .terraform.lock.hcl
+.env
