@@ -106,10 +106,14 @@ This project is not going to be perfect. These are some things off the top of my
 and would like to come back to the project.
 
 - [ ] Add CI/CD pipeline for retraining
-- [ ] Add a config file for static parameter information
+- [ ] Add a training config for standard parameters
 - [ ] clean up mlflow use in data and drift gates
 - [ ] **ADD TESTS** for clean code practices
-- [ ] Additional gate checks for features like feature names, etc, to preserve data quality
+- [ ] Additional gate checks for things like schema validation, null validation, etc
+- [ ] Automated model card artifact in Markdown format
+- [ ] Endpoint monitoring using DataCollector
+- [ ] Feature store integration
+- [ ] Improve README with more information and better architectural diagram
 
 ## Personal Note
 This project has been what feels like a long time coming, but really it's just been a few months of me working on it when I had the time to. In this time, I've had
