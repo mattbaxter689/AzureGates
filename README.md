@@ -252,7 +252,7 @@ like model assets, compute assets, etc. The list of assets and their types can b
 This project is not going to be perfect. These are some things off the top of my head that I would like to add once I have completed the original vision
 and would like to come back to the project.
 
-- [ ] Add CI/CD pipeline for retraining
+- [x] Add CI/CD pipeline for retraining
 - [ ] Add a training config for standard parameters
 - [ ] clean up mlflow use in data and drift gates
 - [ ] **ADD TESTS** for clean code practices
@@ -260,7 +260,7 @@ and would like to come back to the project.
 - [ ] Automated model card artifact in Markdown format
 - [ ] Endpoint monitoring using DataCollector
 - [ ] Feature store integration
-- [ ] Improve README with more information and better architectural diagram
+- [x] Improve README with more information and better architectural diagram
 
 ## Personal Note
 
