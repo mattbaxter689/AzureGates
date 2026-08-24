@@ -4,10 +4,10 @@ from typing import TypedDict
 
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import (
-    ManagedOnlineDeployment,
-    ManagedOnlineEndpoint,
     DataCollector,
     DeploymentCollection,
+    ManagedOnlineDeployment,
+    ManagedOnlineEndpoint,
 )
 from azure.core.exceptions import ResourceNotFoundError
 from mlflow.tracking import MlflowClient
