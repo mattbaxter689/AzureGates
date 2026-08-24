@@ -12,6 +12,7 @@ from data.preprocessing import (
     load_data,
     load_drift_output,
 )
+from config.loader import load_training_config
 from model.tuner import final_training_run, run_tuning
 from utils.logging_utils import setup_logging
 
@@ -46,6 +47,9 @@ def run(args: argparse.Namespace) -> str:
     logger.info(f"Drift output from drift gate: {result}")
 
     if result == "drifted":
+
+        config = load_training_config()
+
         train, val, test = load_data(args.training_data)
         num_cols, cat_cols = infer_schema(train)
 
@@ -86,6 +90,8 @@ def run(args: argparse.Namespace) -> str:
             val_tf,
             val_target,
             num_classes=num_classes,
+            optuna_config=config.optuna,
+            parameter_config=config.hyperparams,
         )
         logger.info(f"Best params: {study.best_params}")
         logger.info(f"Best params F1-score: {study.best_value}")
@@ -103,6 +109,7 @@ def run(args: argparse.Namespace) -> str:
             best_params=best_params,
             scaler_path=scaler_path,
             encoder_path=encoder_path,
+            max_epochs=config.optuna.max_epochs,
         )
 
         logger.info(f"Final training complete. Best F1-score: {best_val_f1}")

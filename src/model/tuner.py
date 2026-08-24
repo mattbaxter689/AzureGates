@@ -4,6 +4,7 @@ import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from config.training_config import OptunaConfig, ParamSpec, CategoricalParam, FloatParam
 import lightning.pytorch as pl
 import mlflow
 import optuna
@@ -32,14 +33,29 @@ mlflow.autolog(disable=True)
 logger = logging.getLogger(__name__)
 
 
+def suggest_params(trial: optuna.Trial, hyperparameters: dict[str, ParamSpec]) -> dict:
+    suggested = {}
+    for name, spec in hyperparameters.items():
+        if isinstance(spec, CategoricalParam):
+            suggested[name] = trial.suggest_categorical(name, spec.choices)
+        elif isinstance(spec, FloatParam):
+            suggested[name] = trial.suggest_float(
+                name, spec.low, spec.high, log=spec.log
+            )
+        else:
+            raise ValueError(f"Unhandled param spec type for '{name}': {type(spec)}")
+    return suggested
+
+
 def make_objective(
     train_df: pd.DataFrame,
     train_target: pd.Series,
     val_df: pd.DataFrame,
     val_target: pd.Series,
     num_classes: int,
+    hyperparameters: dict[str, ParamSpec],
     max_epochs: int = 20,
-) -> Callable:
+) -> Callable[[optuna.Trial]]:
     """
     Function that helps create the objective study for optuna
     """
@@ -55,15 +71,7 @@ def make_objective(
             tags={"mlflow.parentRunId": PARENT_RUN_ID},
             nested=True,
         ) as child_run:
-            params = {
-                "hidden_dim": trial.suggest_categorical("hidden_dim", [64, 128, 256]),
-                "batch_size": trial.suggest_categorical("batch_size", [128, 256, 512]),
-                "dropout": trial.suggest_float("dropout", 0.1, 0.5),
-                "lr": trial.suggest_float("lr", 1e-4, 1e-2, log=True),
-                "weight_decay": trial.suggest_float(
-                    "weight_decay", 1e-5, 1e-3, log=True
-                ),
-            }
+            params = suggest_params(trial, hyperparameters)
 
             hidden_dim = params["hidden_dim"]
             batch_size = params["batch_size"]
@@ -71,6 +79,7 @@ def make_objective(
             lr = params["lr"]
             weight_decay = params["weight_decay"]
 
+            # pass val data twice, since we discard the test loader here
             train_loader, val_loader, _ = make_dataloaders(
                 train_df,
                 train_target,
@@ -127,8 +136,10 @@ def make_objective(
                 return float(val_f1)
 
             finally:
-                del model
-                del trainer
+                if model is not None:
+                    del model
+                if trainer is not None:
+                    del trainer
                 gc.collect()
                 torch.cuda.empty_cache()
 
@@ -141,8 +152,8 @@ def run_tuning(
     val_df: pd.DataFrame,
     val_target: pd.Series,
     num_classes: int,
-    max_epochs: int = 50,
-    n_trials: int = 20,
+    optuna_config: OptunaConfig,
+    parameter_config: dict[str, ParamSpec],
 ) -> optuna.Study:
     """
     Function to run the hyperparameter tuning on optuna
@@ -151,16 +162,25 @@ def run_tuning(
     study = optuna.create_study(
         direction="maximize",
         study_name="sleep-classification-tuner",
-        pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=3),
+        pruner=optuna.pruners.MedianPruner(
+            n_startup_trials=optuna_config.startup_trials,
+            n_warmup_steps=optuna_config.warmup_steps,
+        ),
         sampler=optuna.samplers.TPESampler(seed=42),
     )
 
     objective = make_objective(
-        train_df, train_target, val_df, val_target, num_classes, max_epochs
+        train_df,
+        train_target,
+        val_df,
+        val_target,
+        num_classes,
+        hyperparameters=parameter_config,
+        max_epochs=optuna_config.max_epochs,
     )
 
-    logger.info(f"Starting Optuna tuning: {n_trials}")
-    study.optimize(objective, n_trials, show_progress_bar=False)
+    logger.info(f"Starting Optuna tuning: {optuna_config.n_trials}")
+    study.optimize(objective, optuna_config.n_trials, show_progress_bar=False)
 
     logger.info(
         f"Tuning complete. Best trial {study.best_trial.number}  val_f1={study.best_value:.4f}"
