@@ -1,5 +1,5 @@
 from pydantic import BaseModel, model_validator, Field
-from typing import Literal, Union
+from typing import Literal
 
 
 class CategoricalParam(BaseModel):
@@ -31,7 +31,7 @@ class FloatParam(BaseModel):
         return self
 
 
-ParamSpec = Union[CategoricalParam, FloatParam]
+ParamSpec = CategoricalParam | FloatParam
 
 
 class OptunaConfig(BaseModel):

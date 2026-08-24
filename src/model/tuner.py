@@ -43,7 +43,7 @@ def suggest_params(trial: optuna.Trial, hyperparameters: dict[str, ParamSpec]) -
                 name, spec.low, spec.high, log=spec.log
             )
         else:
-            raise ValueError(f"Unhandled param spec type for '{name}': {type(spec)}")
+            raise TypeError(f"Unhandled param spec type for '{name}': {type(spec)}")
     return suggested
 
 
