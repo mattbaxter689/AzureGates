@@ -1,10 +1,10 @@
 import os
 import re
 from pathlib import Path
-
 import yaml
 
-from config.config_models import OrchestratorConfig
+from config.orchestrator_config import OrchestratorConfig
+from config.training_config import TuningConfig
 
 ORCHESTRATOR_ROOT = Path(__file__).parent.parent.parent
 _VAR_PATTERN = re.compile(r"\$\{([A-Z0-9_]+)\}")
@@ -28,7 +28,14 @@ def _substitute_env(obj):
     return obj
 
 
-def load_config(path: str) -> OrchestratorConfig:
+def load_orchestrator_config(path: str) -> OrchestratorConfig:
     raw = yaml.safe_load((ORCHESTRATOR_ROOT / path).read_text())
     substituted = _substitute_env(raw)
     return OrchestratorConfig.model_validate(substituted)
+
+
+def load_training_config(path: str = "training_config.yaml") -> TuningConfig:
+    raw = yaml.safe_load(Path(path).read_text())
+    config = TuningConfig.model_validate(raw)
+
+    return config

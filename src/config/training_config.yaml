@@ -1,0 +1,27 @@
+optuna_study:
+  n_trials: 20
+  max_epochs: 50
+  startup_trials: 5
+  warmup_steps: 3
+
+hyperparameters:
+  hidden_dim:
+    type: categorical
+    choices: [64, 128, 256]
+  batch_size:
+    type: categorical
+    choices: [128, 256, 512]
+  dropout:
+    type: float
+    low: 0.1
+    high: 0.5
+  lr:
+    type: float
+    low: 1.0e-4
+    high: 1.0e-2
+    log: true
+  weight_decay:
+    type: float
+    low: 1.0e-5
+    high: 1.0e-3
+    log: true
