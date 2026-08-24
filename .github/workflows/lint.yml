@@ -23,7 +23,7 @@ jobs:
       - name: Check formatting
         run: uv run ruff format .
 
-      - name: Fix:
+      - name: Fix
         run: uv run ruff check --fix .
 
       - name: Lint
