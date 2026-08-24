@@ -3,7 +3,12 @@ import logging
 from typing import TypedDict
 
 from azure.ai.ml import MLClient
-from azure.ai.ml.entities import ManagedOnlineDeployment, ManagedOnlineEndpoint
+from azure.ai.ml.entities import (
+    ManagedOnlineDeployment,
+    ManagedOnlineEndpoint,
+    DataCollector,
+    DeploymentCollection,
+)
 from azure.core.exceptions import ResourceNotFoundError
 from mlflow.tracking import MlflowClient
 
@@ -26,28 +31,25 @@ class Decision(TypedDict):
     challenger_latency_ms: float | None
 
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Execute the promotion / shadow-deployment decision"
-    )
-    p.add_argument(
-        "--decision-input",
-        type=str,
-        required=True,
-        help="Folder containing decision.json from the gate step",
-    )
-    p.add_argument("--endpoint-name", type=str, required=True)
-    p.add_argument("--instance-type", type=str, default="Standard_DS3_v2")
-    p.add_argument("--mirror-pct", type=int, default=10)
-    return p.parse_args()
-
-
 def ensure_endpoint(ml_client: MLClient, endpoint_name: str) -> ManagedOnlineEndpoint:
     try:
         return ml_client.online_endpoints.get(endpoint_name)
     except ResourceNotFoundError:
         endpoint = ManagedOnlineEndpoint(name=endpoint_name, auth_mode="key")
         return ml_client.online_endpoints.begin_create_or_update(endpoint).result()
+
+
+def build_data_collector() -> DataCollector:
+    """
+    Build a data collector to collect API inputs and outputs. Will be used to audit the model performance
+    over time and assess model performance. Can be used to build a model rollback system
+    """
+    return DataCollector(
+        collections={
+            "request": DeploymentCollection(enabled="True"),
+            "response": DeploymentCollection(enabled="True"),
+        }
+    )
 
 
 def ensure_deployment(
@@ -59,6 +61,9 @@ def ensure_deployment(
     instance_type: str,
     environment_name: str,
 ) -> None:
+    """
+    Create or update a managed endpoint
+    """
     deployment = ManagedOnlineDeployment(
         name=deployment_name,
         endpoint_name=endpoint_name,
@@ -66,6 +71,7 @@ def ensure_deployment(
         instance_type=instance_type,
         instance_count=1,
         environment=environment_name,
+        data_collector=build_data_collector(),
     )
     ml_client.online_deployments.begin_create_or_update(deployment).result()
 
@@ -89,11 +95,15 @@ def handle_promote_first(
     decision: Decision,
     args: argparse.Namespace,
 ) -> None:
+    """
+    Safety net: If we do not have a current champion model live, create an endpoint of the
+    current champion model to ensure we have a model serving endpoint
+    """
     model_name = decision["model_name"]
     version = decision["challenger_version"]
-    assert version is not None, (
-        "promote_first decision must include a challenger_version"
-    )
+    assert (
+        version is not None
+    ), "promote_first decision must include a challenger_version"
 
     logger.info(
         f"No champion exists — promoting challenger v{version} directly to champion."
@@ -118,16 +128,20 @@ def handle_promote_first(
 
 def handle_shadow(
     ml_client: MLClient,
-    mlflow_client: MlflowClient,
     decision: Decision,
     args: argparse.Namespace,
 ) -> None:
+    """
+    If the challenger model meets criteria for shadow deployment, deploy model
+    to mirror all traffic coming to the champion endpoint. This will allow direct
+    model performance comparison to determine challenger promotion
+    """
     model_name = decision["model_name"]
     challenger_version = decision["challenger_version"]
     champion_version = decision["champion_version"]
-    assert challenger_version is not None and champion_version is not None, (
-        "shadow decision must include both challenger_version and champion_version"
-    )
+    assert (
+        challenger_version is not None and champion_version is not None
+    ), "shadow decision must include both challenger_version and champion_version"
 
     logger.info(
         f"Challenger v{challenger_version} beat champion v{champion_version} — "
@@ -166,6 +180,10 @@ def handle_reject(
     mlflow_client: MlflowClient,
     decision: Decision,
 ) -> None:
+    """
+    If a challenger fails the required checks to be used in a shadow deployment
+    then we gracefully archive the model to not bloat
+    """
     model_name = decision["model_name"]
     version = decision["challenger_version"]
 
