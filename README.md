@@ -252,15 +252,18 @@ like model assets, compute assets, etc. The list of assets and their types can b
 This project is not going to be perfect. These are some things off the top of my head that I would like to add once I have completed the original vision
 and would like to come back to the project.
 
-- [x] Add CI/CD pipeline for retraining
+- [x] <del>Add CI/CD pipeline for retraining</del>
 - [ ] Add a training config for standard parameters
-- [ ] clean up mlflow use in data and drift gates
 - [ ] **ADD TESTS** for clean code practices
 - [ ] Additional gate checks for things like schema validation, null validation, etc
 - [ ] Automated model card artifact in Markdown format
-- [ ] Endpoint monitoring using DataCollector
+- [ ] Endpoint monitoring to replace drift detection gating and better monitoring.
 - [ ] Feature store integration
-- [x] Improve README with more information and better architectural diagram
+- [x] <del>Improve README with more information and better architectural diagram</del>
+
+My inital thoughts of upgrades follows, for now based on my availability, the following: training configs with yaml, automated model cards, endpoint monitoring and drift replacement, tests
+
+Everything else is a nice to have, but to me this takes things a step further to a production like setup
 
 ## Personal Note
 
