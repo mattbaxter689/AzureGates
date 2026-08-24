@@ -8,15 +8,17 @@ from azure.identity import DefaultAzureCredential
 from rich.console import Console
 from rich.panel import Panel
 
-from src.config.config_models import OrchestratorConfig
-from src.config.loader import load_config
+from src.config.orchestrator_config import OrchestratorConfig
+from src.config.loader import load_orchestrator_config
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 log = logging.getLogger("orchestrator")
 console = Console()
 
 ROOT = Path(__file__).parent
-CONFIG: OrchestratorConfig = load_config("settings/orchestrator_config.yaml")
+CONFIG: OrchestratorConfig = load_orchestrator_config(
+    "settings/orchestrator_config.yaml"
+)
 
 
 # ----- AML client and environment -------

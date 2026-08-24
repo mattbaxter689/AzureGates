@@ -253,7 +253,7 @@ This project is not going to be perfect. These are some things off the top of my
 and would like to come back to the project.
 
 - [x] <del>Add CI/CD pipeline for retraining</del>
-- [ ] Add a training config for standard parameters
+- [x] <del>Add a training config for standard parameters</del>
 - [ ] **ADD TESTS** for clean code practices
 - [ ] Additional gate checks for things like schema validation, null validation, etc
 - [ ] Automated model card artifact in Markdown format
