@@ -256,8 +256,8 @@ and would like to come back to the project.
 - [x] <del>Add a training config for standard parameters</del>
 - [ ] **ADD TESTS** for clean code practices
 - [ ] Additional gate checks for things like schema validation, null validation, etc
-- [ ] Automated model card artifact in Markdown format
-- [ ] Endpoint monitoring to replace drift detection gating and better monitoring.
+- [x] <del>Automated model card artifact in Markdown format</del>
+- [ ] Azure model monitoring to replace manual drift detection calculations.
 - [ ] Feature store integration
 - [x] <del>Improve README with more information and better architectural diagram</del>
 
