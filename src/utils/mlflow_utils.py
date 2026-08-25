@@ -1,6 +1,8 @@
+import datetime
 import json
 import logging
 import os
+import tempfile
 from pathlib import Path
 
 import mlflow
@@ -44,7 +46,7 @@ def tag_challenger(
     baseline_f1: float = 0.70,
 ) -> str | None:
     """
-    Register the best fvinal model as a new model version and tag it as current challenger
+    Register the best final model as a new model version and tag it as current challenger
     candidate, if it clears a baseline.
     """
     logger.info(f"Validating challenger candidate for run: {run_id}")
@@ -98,3 +100,80 @@ def resolve_version_by_role(
         )
 
     return max(versions, key=lambda v: int(v.version))
+
+
+def _dict_to_md_table(d: dict) -> str:
+    """
+    parse dictionary to markdown table format
+    """
+    return "\n".join(f"| {k} | {v} |" for k, v in d.items())
+
+
+def generate_model_card(
+    framework_version: str,
+    run_id: str,
+    dataset_uri: str,
+    features: list[str],
+    params: dict[str, float | int],
+    metrics: dict[str, float | int],
+) -> str:
+    """
+    Generate a model card in markdown format associated with the model.
+    This will help maintain record and track in case of auditing purposes
+    """
+
+    params_table = _dict_to_md_table(params)
+    metrics_table = _dict_to_md_table(metrics)
+
+    return f"""# Model Card: sleep_disorder_classifier 
+
+## Model Details
+- **Name:** sleep_disorder_classifier
+- **Type:** PyTorch lightning Classifier
+- **Author(s):** Matthew
+- **Date:** {datetime.datetime.now(datetime.UTC)}
+- **Framework:** PyTorch Lightning / PyTorch {framework_version}
+- **MLflow Run ID:** {run_id}
+
+## Intended Use
+To classify people and their sleep data to assess their risks of 
+obtaining a sleep disorder, based upon sleep metrics collected.
+
+## Training Data
+- **Version/URI:** {dataset_uri}
+- **Features:** {features}
+
+## Training Configuration
+| Parameter | Value |
+|---|---|
+{params_table}
+
+## Evaluation Metrics
+| Metric | Value |
+|---|---|
+{metrics_table}
+
+## Limitations & Ethical Considerations
+This should only be used to assess sleep disorder probability, and only this.
+It should not be used in any sense beyond these means.
+"""
+
+
+def generate_model_card_and_save(
+    framework_version: str,
+    run_id: str,
+    dataset_uri: str,
+    features: list[str],
+    params: dict[str, float | int],
+    metrics: dict[str, float | int],
+):
+    card_md = generate_model_card(
+        framework_version, run_id, dataset_uri, features, params, metrics
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        card_path = Path(tmp) / "model_card.md"
+        with open(card_path, "w") as f:
+            f.write(card_md)
+
+    return card_path

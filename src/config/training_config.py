@@ -1,5 +1,6 @@
-from pydantic import BaseModel, model_validator, Field
 from typing import Literal
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class CategoricalParam(BaseModel):

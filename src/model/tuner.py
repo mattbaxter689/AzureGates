@@ -4,7 +4,6 @@ import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from config.training_config import OptunaConfig, ParamSpec, CategoricalParam, FloatParam
 import lightning.pytorch as pl
 import mlflow
 import optuna
@@ -14,6 +13,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.loggers.mlflow import MLFlowLogger
 from optuna.integration import PyTorchLightningPruningCallback
 
+from config.training_config import CategoricalParam, FloatParam, OptunaConfig, ParamSpec
 from data.dataset import make_dataloaders
 from model.callbacks import (
     MlflowArtifactCallback,
@@ -200,6 +200,8 @@ def final_training_run(
     best_params: dict[str, str | int | float],
     scaler_path: str,
     encoder_path: str,
+    dataset_uri: str,
+    features: list[str],
     ckpt_dir: str = "checkpoints",
     max_epochs: int = 50,
 ) -> tuple[str, float]:
@@ -231,7 +233,11 @@ def final_training_run(
     ckpt_cb = make_checkpoint(ckpt_dir)
     early_stopping = make_early_stopping(patience=5)
     artifact_db = MlflowArtifactCallback(
-        ckpt_cb, scaler_path=str(scaler_path), label_encoder_path=str(encoder_path)
+        ckpt_cb,
+        scaler_path=str(scaler_path),
+        label_encoder_path=str(encoder_path),
+        features=features,
+        dataset_uri=dataset_uri,
     )
 
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")

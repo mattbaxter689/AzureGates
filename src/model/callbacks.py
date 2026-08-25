@@ -1,6 +1,7 @@
 import logging
 import os
 
+import lightning
 import lightning.pytorch as pl
 import mlflow
 from lightning.pytorch.callbacks import (
@@ -10,6 +11,7 @@ from lightning.pytorch.callbacks import (
 )
 
 from model.pyfunc_wrapper import SleepRiskPredictor
+from utils.mlflow_utils import generate_model_card_and_save
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +60,15 @@ class MlflowArtifactCallback(Callback):
         checkpoint_callback: ModelCheckpoint,
         scaler_path: str,
         label_encoder_path: str,
+        features: list[str],
+        dataset_uri: str,
     ) -> None:
         super().__init__()
         self._ckpt_cb = checkpoint_callback
         self._scaler_path = scaler_path
         self._label_encoder_path = label_encoder_path
+        self.features = features
+        self.dataset_uri = dataset_uri
 
     def on_train_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
 
@@ -73,6 +79,24 @@ class MlflowArtifactCallback(Callback):
             return
 
         if best_ckpt_path:
+            final_metrics = {k: float(v) for k, v in trainer.callback_metrics.items()}
+            params = dict(pl_module.hparams)
+            datamodule = getattr(trainer, "datamodule", None)
+            batch_size = (
+                getattr(datamodule, "batch_size", None)
+                if datamodule is not None
+                else None
+            )
+            params.update({"max_epochs": trainer.max_epochs, "batch_size": batch_size})
+            model_card = generate_model_card_and_save(
+                lightning.__version__,
+                mlflow.active_run().info.run_id,
+                self.dataset_uri,
+                self.features,
+                params,
+                final_metrics,
+            )
+
             logger.info("Packaging model and scaler into custom PyFunc model")
 
             # define the artifacts to map to mlflow
@@ -80,6 +104,7 @@ class MlflowArtifactCallback(Callback):
                 "checkpoint": best_ckpt_path,
                 "scaler": self._scaler_path,
                 "label_encoder": self._label_encoder_path,
+                "model_card": model_card,
             }
 
             mlflow.pyfunc.log_model(
