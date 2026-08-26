@@ -265,6 +265,11 @@ My inital thoughts of upgrades follows, for now based on my availability, the fo
 
 Everything else is a nice to have, but to me this takes things a step further to a production like setup
 
+## Model Monitoring Note
+Azure ML is great in the sense that it has model monitoring built into the platform. We just need to specify the model and reference data (and some additional information), and we have access to complete model monitoring metrics without needing to perform the calculations by hand. In reality, this should be used to perform the respective drift checks to assess if new model training is needed. This way, there is a physical record of checks and metrics performed, and we can access the associated metrics fro mruns to perform the assessment of drift or not. 
+
+This step would replace the current drift detection calculation checks, and instead lookup / download the latest model metrics, and use the pre-calculated statistics to determine if the model or data has drifted. From there, we would perform additional schema validations to ensure data consistency.
+
 ## Personal Note
 
 This project has been what feels like a long time coming, but really it's just been a few months of me working on it when I had the time to. In this time, I've had
