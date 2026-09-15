@@ -13,7 +13,7 @@ class EnvironmentConfig(BaseModel):
 
     @property
     def full_name(self) -> str:
-        return f"{self.name}@{self.verison}"
+        return f"{self.name}@{self.version}"
 
 
 class ComputeConfig(BaseModel):
