@@ -283,6 +283,10 @@ learned a hell of a lot about the Azure ecosystem, and improved my understanding
 I will have a fully functioning AzureML DSL pipeline. While not production
 grade in my eyes (as all things can be improve), it's better than other pipelines I've made.
 
+## Changes to Make
+- Swap so that the configs are referenced in a solo directory within src for modelling
+- create sub-dir config structure for individual config-level pieces. See log-stream project for examples of implementing
+
 ## Troubleshooting / Common Issues
 
 In the early stages of development, so far I have experience some issues that caused me a decent amount of pain.
